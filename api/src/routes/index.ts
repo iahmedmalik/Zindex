@@ -10,6 +10,7 @@ import { ordersRouter } from "./orders";
 import { paymentsRouter } from "./payments";
 import { productsRouter } from "./products";
 import { shipmentRouter, shipmentsListRouter } from "./shipments";
+import { reportsRouter } from "./reports";
 import { requireUser } from "./require-user";
 import { stockRouter } from "./stock";
 import { storesRouter } from "./stores";
@@ -23,6 +24,7 @@ export function createRoutes(ctx: AppContext): Router {
   router.use("/stores", storesRouter(ctx.db));
   router.use("/dashboard", dashboardRouter(ctx.db));
   router.use("/backup", backupRouter(ctx.db));
+  router.use("/reports", reportsRouter(ctx.db));
   router.use("/stores/:storeId/products", productsRouter(ctx.db));
   router.use("/stores/:storeId/customers", customersRouter(ctx.db));
   router.use("/stores/:storeId/orders", ordersRouter(ctx.db));
