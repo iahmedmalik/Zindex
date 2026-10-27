@@ -176,12 +176,17 @@ export function ordersRouter(db: Db): Router {
     const digits = normalisePhone(q);
     const status = typeof req.query.status === "string" ? req.query.status : "";
     if (status && !(stages as readonly string[]).includes(status)) throw new HttpError(400, "Unknown status.");
+    const payment = typeof req.query.payment === "string" ? req.query.payment : "";
+    if (payment && !["paid", "cod", "unpaid"].includes(payment)) throw new HttpError(400, "Unknown payment.");
+    const method = typeof req.query.method === "string" ? req.query.method : "";
     const list = await asOwner(db, req.user!.id, (tx) =>
       rows<Order>(
         tx,
         sql`select ${orderSelect} from orders o
             where o.store_id = ${storeId}
               and (${status} = '' or o.status = ${status})
+              and (${payment} = '' or o.payment = ${payment})
+              and (${method} = '' or o.payment_method = ${method})
               and (${q} = '' or o.customer_name ilike ${"%" + q + "%"}
                    or (${digits} <> '' and o.customer_phone like ${"%" + digits + "%"})
                    or o.order_no::text = ${q.replace(/^#/, "")})
