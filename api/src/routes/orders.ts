@@ -6,6 +6,7 @@ import { pgCode, rows, textArray } from "../db/query";
 import { HttpError } from "../http-error";
 import { calculateTotals } from "../invoice/totals";
 import { canMove, stages, type Stage } from "../orders/stages";
+import { recordInvoiceEdit } from "./invoices";
 import { deductForOrder, restoreForOrder, type StockWarning } from "../stock/ledger";
 import { normalisePhone } from "../phone";
 import { validateBody } from "../validate";
@@ -278,7 +279,9 @@ export function ordersRouter(db: Db): Router {
             where id = ${id}`,
       );
       if (b.items) await writeItems(tx, id, items);
-      return loadOrder(tx, storeId, id);
+      const saved = await loadOrder(tx, storeId, id);
+      await recordInvoiceEdit(tx, current, saved!);
+      return saved;
     });
     res.json({ order });
   });
