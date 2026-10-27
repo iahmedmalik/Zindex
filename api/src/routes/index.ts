@@ -11,6 +11,7 @@ import { productsRouter } from "./products";
 import { requireUser } from "./require-user";
 import { stockRouter } from "./stock";
 import { storesRouter } from "./stores";
+import { whatsappRouter } from "./whatsapp";
 
 // Everything under /v1 except sign-in needs a signed-in owner.
 export function createRoutes(ctx: AppContext): Router {
@@ -27,6 +28,7 @@ export function createRoutes(ctx: AppContext): Router {
   router.use("/stores/:storeId/orders/:orderId/card", cardsRouter(ctx.db, ctx.config));
   router.use("/stores/:storeId/invoices", invoicesRouter(ctx.db));
   router.use("/stores/:storeId", paymentsRouter(ctx.db));
+  router.use("/stores/:storeId", whatsappRouter(ctx.db));
   router.use("/stores/:storeId/stock", stockRouter(ctx.db));
   return router;
 }
