@@ -1,4 +1,4 @@
-import type { SQL } from "drizzle-orm";
+import { sql, type SQL } from "drizzle-orm";
 import type { Tx } from "./client";
 
 const camelKey = (key: string) => key.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase());
@@ -19,3 +19,6 @@ export function pgCode(err: unknown): string | undefined {
   const e = err as { code?: string; cause?: { code?: string } };
   return e.cause?.code ?? e.code;
 }
+
+/** A text[] value built from a JS array (Drizzle would otherwise expand the array into a value list). */
+export const textArray = (items: string[]) => sql`array(select jsonb_array_elements_text(${JSON.stringify(items)}::jsonb))`;
