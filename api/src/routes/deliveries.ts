@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { Router, type Request } from "express";
+import express, { Router, type Request } from "express";
 import { z } from "zod";
 import { asOwner, type Db, type Tx } from "../db/client";
 import { rows } from "../db/query";
@@ -43,6 +43,7 @@ export type Delivery = {
   riderPhone: string | null;
   bikeNumber: string | null;
   riderPhotoUrl: string | null;
+  hasPhoto: boolean;
   riderPhotoTakenAt: Date | null;
   trackingUrl: string | null;
   riderScreenshotUrl: string | null;
@@ -53,7 +54,7 @@ export type Delivery = {
   cashHandedAt: Date | null;
 };
 
-const cols = sql`id, order_id, service, rider_name, rider_phone, bike_number, rider_photo_url, rider_photo_taken_at, tracking_url, rider_screenshot_url, pickup_address, notes, status, cash_handed_over, cash_handed_at`;
+const cols = sql`id, order_id, service, rider_name, rider_phone, bike_number, rider_photo_url, rider_photo_taken_at, tracking_url, rider_screenshot_url, pickup_address, notes, status, cash_handed_over, cash_handed_at, exists (select 1 from delivery_photos p where p.delivery_id = deliveries.id) as has_photo`;
 
 const maps = (address: string) => `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
 const pkr = (n: number) => `PKR ${n.toLocaleString("en-US")}`;
@@ -140,6 +141,35 @@ export function deliveriesRouter(db: Db): Router {
       await tx.execute(sql`update deliveries set status = ${status}, updated_at = now() where id = ${delivery.id}`);
       await tx.execute(sql`insert into delivery_events (delivery_id, status) values (${delivery.id}, ${status})`);
       return loadDelivery(tx, orderId);
+    });
+    res.json(result);
+  });
+
+  // The rider's photo: one small JPEG or WebP per delivery (the app shrinks it first). It lives in the
+  // database, goes with the delivery, and reaches the customer only through a valid card link.
+  const photoBody = express.raw({ type: ["image/jpeg", "image/webp"], limit: "600kb" });
+  router.put("/photo", photoBody, async (req, res) => {
+    const type = req.headers["content-type"]?.split(";")[0];
+    const bytes = req.body as Buffer | undefined;
+    if (!Buffer.isBuffer(bytes) || bytes.length === 0) throw new HttpError(400, "Send the photo as a JPEG or WebP image, up to 600 KB.");
+    const result = await withOrder(req, async (tx, o, storeId, orderId) => {
+      if (o.deliveryKind !== "local") throw new HttpError(409, "Only a local-delivery order has a rider photo.");
+      if (o.status === "cancelled") throw new HttpError(409, "A cancelled order has no delivery.");
+      await tx.execute(sql`insert into deliveries (store_id, order_id) values (${storeId}, ${orderId}) on conflict (order_id) do nothing`);
+      const { delivery } = await loadDelivery(tx, orderId);
+      await tx.execute(
+        sql`insert into delivery_photos (delivery_id, image, content_type) values (${delivery!.id}, ${bytes}, ${type})
+            on conflict (delivery_id) do update set image = excluded.image, content_type = excluded.content_type, created_at = now()`,
+      );
+      return { hasPhoto: true };
+    });
+    res.json(result);
+  });
+
+  router.delete("/photo", async (req, res) => {
+    const result = await withOrder(req, async (tx, _o, _storeId, orderId) => {
+      const gone = await rows<{ id: string }>(tx, sql`delete from delivery_photos where delivery_id = (select id from deliveries where order_id = ${orderId}) returning delivery_id as id`);
+      return { removed: gone.length };
     });
     res.json(result);
   });
