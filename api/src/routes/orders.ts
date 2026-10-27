@@ -88,6 +88,7 @@ export type Order = {
   amountDue: number;
   notes: string | null;
   stockApplied: boolean;
+  paymentConfirmedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
   items: OrderItem[];
@@ -96,7 +97,7 @@ export type Order = {
 const orderSelect = sql`
   o.id, o.store_id, o.order_no, o.customer_id, o.customer_name, o.customer_phone, o.address, o.source, o.status,
   o.delivery_kind, o.payment, o.payment_method, o.discount_percent, o.delivery_charge, o.rider_fee, o.subtotal,
-  o.discount, o.total, o.cod_amount, o.collect_at_door, o.amount_due, o.notes, o.stock_applied, o.created_at, o.updated_at,
+  o.discount, o.total, o.cod_amount, o.collect_at_door, o.amount_due, o.notes, o.stock_applied, o.payment_confirmed_at, o.created_at, o.updated_at,
   coalesce((select json_agg(json_build_object('id', i.id, 'productId', i.product_id, 'name', i.name,
                                               'quantity', i.quantity, 'unitPrice', i.unit_price) order by i.position)
               from order_items i where i.order_id = o.id), '[]'::json) as items`;
