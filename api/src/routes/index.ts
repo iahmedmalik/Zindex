@@ -1,6 +1,7 @@
 import { Router } from "express";
 import type { AppContext } from "../app";
 import { customersRouter } from "./customers";
+import { ordersRouter } from "./orders";
 import { productsRouter } from "./products";
 import { requireUser } from "./require-user";
 import { storesRouter } from "./stores";
@@ -13,5 +14,6 @@ export function createRoutes(ctx: AppContext): Router {
   router.use("/stores", storesRouter(ctx.db));
   router.use("/stores/:storeId/products", productsRouter(ctx.db));
   router.use("/stores/:storeId/customers", customersRouter(ctx.db));
+  router.use("/stores/:storeId/orders", ordersRouter(ctx.db));
   return router;
 }

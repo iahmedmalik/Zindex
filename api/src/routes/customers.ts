@@ -27,8 +27,10 @@ const createBody = z
 const updateBody = createBody.partial().strict();
 
 const returning = sql`id, store_id, name, phone, addresses, notes, created_at`;
+// Repeat customers are the ones with more than one order.
+const withCount = sql`id, store_id, name, phone, addresses, notes, created_at, (select count(*)::int from orders o where o.customer_id = customers.id) as order_count`;
 
-export type Customer = { id: string; storeId: string; name: string; phone: string; addresses: string[]; notes: string | null; createdAt: Date };
+export type Customer = { id: string; storeId: string; name: string; phone: string; addresses: string[]; notes: string | null; createdAt: Date; orderCount?: number };
 
 // Mounted at /v1/stores/:storeId/customers
 export function customersRouter(db: Db): Router {
@@ -40,7 +42,7 @@ export function customersRouter(db: Db): Router {
     const list = await asOwner(db, req.user!.id, (tx) =>
       rows<Customer>(
         tx,
-        sql`select ${returning} from customers
+        sql`select ${withCount} from customers
             where store_id = ${storeIdOf(req)}
               and (${q} = '' or name ilike ${"%" + q + "%"} or (${digits} <> '' and phone like ${"%" + digits + "%"}))
             order by lower(name) limit 100`,
@@ -51,7 +53,7 @@ export function customersRouter(db: Db): Router {
 
   router.get("/:id", async (req, res) => {
     const [customer] = await asOwner(db, req.user!.id, (tx) =>
-      rows<Customer>(tx, sql`select ${returning} from customers where id = ${idParam(req, "id", "Customer")} and store_id = ${storeIdOf(req)}`),
+      rows<Customer>(tx, sql`select ${withCount} from customers where id = ${idParam(req, "id", "Customer")} and store_id = ${storeIdOf(req)}`),
     );
     if (!customer) throw new HttpError(404, "Customer not found.");
     res.json({ customer });
