@@ -1,5 +1,6 @@
 import { Router } from "express";
 import type { AppContext } from "../app";
+import { cardsRouter } from "./cards";
 import { customersRouter } from "./customers";
 import { deliveriesRouter } from "./deliveries";
 import { invoicesRouter, orderInvoiceRouter } from "./invoices";
@@ -20,6 +21,7 @@ export function createRoutes(ctx: AppContext): Router {
   router.use("/stores/:storeId/orders", ordersRouter(ctx.db));
   router.use("/stores/:storeId/orders/:orderId/invoice", orderInvoiceRouter(ctx.db));
   router.use("/stores/:storeId/orders/:orderId/delivery", deliveriesRouter(ctx.db));
+  router.use("/stores/:storeId/orders/:orderId/card", cardsRouter(ctx.db, ctx.config));
   router.use("/stores/:storeId/invoices", invoicesRouter(ctx.db));
   router.use("/stores/:storeId/stock", stockRouter(ctx.db));
   return router;
