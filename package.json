@@ -1,0 +1,21 @@
+{
+  "name": "zindex",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A back office for WhatsApp-driven shops: invoices, in-house stock and a delivery card for riders",
+  "workspaces": [
+    "api"
+  ],
+  "scripts": {
+    "dev:api": "npm run dev -w api",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "build": "npm run build --workspaces --if-present"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  },
+  "engines": {
+    "node": "22.x"
+  }
+}
