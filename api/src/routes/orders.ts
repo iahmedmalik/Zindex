@@ -6,6 +6,7 @@ import { pgCode, rows, textArray } from "../db/query";
 import { HttpError } from "../http-error";
 import { calculateTotals } from "../invoice/totals";
 import { canMove, stages, type Stage } from "../orders/stages";
+import { deductForOrder, restoreForOrder, type StockWarning } from "../stock/ledger";
 import { normalisePhone } from "../phone";
 import { validateBody } from "../validate";
 import { idParam, storeIdOf } from "./ids";
@@ -291,9 +292,27 @@ export function ordersRouter(db: Db): Router {
       if (!current) throw new HttpError(404, "Order not found.");
       if (!canMove(current.status, status)) throw new HttpError(409, `An order that is ${current.status.replace(/_/g, " ")} cannot become ${status.replace(/_/g, " ")}.`);
       await tx.execute(sql`update orders set status = ${status}, updated_at = now() where id = ${id}`);
-      return loadOrder(tx, storeId, id);
+      // Confirming is the one moment stock moves. A zero-stock sale still goes through; the
+      // warning tells the owner which products are now below zero.
+      const stockWarnings: StockWarning[] = status === "confirmed" ? await deductForOrder(tx, storeId, id) : [];
+      return { order: await loadOrder(tx, storeId, id), stockWarnings };
     });
-    res.json({ order });
+    res.json(order);
+  });
+
+  // The owner approves putting a cancelled or returned order's stock back. Never automatic.
+  router.post("/:id/restore-stock", async (req, res) => {
+    const storeId = storeIdOf(req);
+    const id = idParam(req, "id", "Order");
+    const result = await asOwner(db, req.user!.id, async (tx) => {
+      const current = await loadOrder(tx, storeId, id);
+      if (!current) throw new HttpError(404, "Order not found.");
+      if (current.status !== "cancelled" && current.status !== "returned") throw new HttpError(409, "Only a cancelled or returned order can have its stock put back.");
+      if (!current.stockApplied) throw new HttpError(409, "This order has no deducted stock to put back.");
+      const restored = await restoreForOrder(tx, storeId, id);
+      return { order: await loadOrder(tx, storeId, id), restored };
+    });
+    res.json(result);
   });
 
   return router;

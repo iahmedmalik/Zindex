@@ -4,6 +4,7 @@ import { customersRouter } from "./customers";
 import { ordersRouter } from "./orders";
 import { productsRouter } from "./products";
 import { requireUser } from "./require-user";
+import { stockRouter } from "./stock";
 import { storesRouter } from "./stores";
 
 // Everything under /v1 except sign-in needs a signed-in owner.
@@ -15,5 +16,6 @@ export function createRoutes(ctx: AppContext): Router {
   router.use("/stores/:storeId/products", productsRouter(ctx.db));
   router.use("/stores/:storeId/customers", customersRouter(ctx.db));
   router.use("/stores/:storeId/orders", ordersRouter(ctx.db));
+  router.use("/stores/:storeId/stock", stockRouter(ctx.db));
   return router;
 }
