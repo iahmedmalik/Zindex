@@ -10,6 +10,8 @@ import { invoicesRouter, orderInvoiceRouter } from "./invoices";
 import { ordersRouter } from "./orders";
 import { paymentsRouter } from "./payments";
 import { productsRouter } from "./products";
+import { shopifyRouter } from "./shopify";
+import { parseApps } from "../shopify/products";
 import { shipmentRouter, shipmentsListRouter } from "./shipments";
 import { reportsRouter } from "./reports";
 import { requireUser } from "./require-user";
@@ -35,6 +37,7 @@ export function createRoutes(ctx: AppContext): Router {
   router.use("/stores/:storeId/orders/:orderId/shipment", shipmentRouter(ctx.db));
   router.use("/stores/:storeId/shipments", shipmentsListRouter(ctx.db));
   router.use("/stores/:storeId/import", importsRouter(ctx.db));
+  router.use("/stores/:storeId/shopify", shopifyRouter(ctx.db, parseApps(ctx.config.SHOPIFY_APPS), ctx.fetch ?? fetch));
   router.use("/stores/:storeId/invoices", invoicesRouter(ctx.db));
   router.use("/stores/:storeId", paymentsRouter(ctx.db));
   router.use("/stores/:storeId", whatsappRouter(ctx.db));

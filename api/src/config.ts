@@ -9,6 +9,8 @@ const schema = z.object({
   // Email is sent through Brevo when a key is set; without one the link is printed in the log (development).
   BREVO_API_KEY: z.string().min(1).optional(),
   MAIL_FROM: z.string().min(3).default("Zindex <no-reply@example.com>"),
+  // Shopify product sync: {"shop.myshopify.com": {"clientId": "...", "clientSecret": "..."}}. Render only.
+  SHOPIFY_APPS: z.string().optional(),
   PORT: z.coerce.number().int().positive().default(4000),
   NODE_ENV: z.string().default("development"),
 });

@@ -13,6 +13,8 @@ export type AppContext = {
   config: Config;
   db: Db;
   auth: Auth;
+  /** Stand-in for outside calls (Shopify) in tests. */
+  fetch?: typeof fetch;
 };
 
 export function createApp(ctx?: AppContext): Express {
