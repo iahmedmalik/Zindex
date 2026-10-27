@@ -1,0 +1,30 @@
+# Render Blueprint for the API. Secrets are never written here: `sync: false` means Render asks for the
+# value in its dashboard, and the value stays there. The database is Neon (free); the web app is on Vercel.
+services:
+  - type: web
+    name: zindex-api
+    runtime: node
+    region: singapore # next to the Neon database
+    plan: free
+    buildCommand: npm ci && npm run build -w @zindex/api
+    startCommand: npm run start -w @zindex/api
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: 22
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL_APP
+        sync: false
+      - key: BETTER_AUTH_SECRET
+        sync: false
+      - key: WEB_ORIGIN
+        sync: false
+      # Email for sign-up confirmation and password reset (Brevo's free plan). Without it the links are only logged.
+      - key: BREVO_API_KEY
+        sync: false
+      - key: MAIL_FROM
+        sync: false
+      # Optional: Shopify product sync. One line of JSON, read_products only. Leave unset to switch it off.
+      - key: SHOPIFY_APPS
+        sync: false

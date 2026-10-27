@@ -11,7 +11,9 @@
     "test": "vitest run --passWithNoTests",
     "typecheck": "tsc --noEmit",
     "dev:db": "tsx scripts/dev-db.ts",
-    "db:migrate": "tsx --env-file-if-exists=.env.local scripts/migrate.ts"
+    "db:migrate": "tsx --env-file-if-exists=.env.local scripts/migrate.ts",
+    "seed": "tsx --env-file-if-exists=.env.local scripts/seed-dev.ts",
+    "load": "tsx scripts/load-test.ts"
   },
   "dependencies": {
     "better-auth": "^1.7.12",

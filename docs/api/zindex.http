@@ -1,0 +1,167 @@
+### Zindex API: a request collection for the VS Code "REST Client" extension (or any .http runner).
+### Run the API locally first (see the README), then sign in once and the cookie is reused below.
+### Variables
+@api = http://127.0.0.1:4000
+@origin = http://localhost:3500
+@store = PASTE-A-STORE-ID
+@order = PASTE-AN-ORDER-ID
+@product = PASTE-A-PRODUCT-ID
+
+### Health (no sign-in; also what keeps the free server awake)
+GET {{api}}/health
+
+### Sign in. Better Auth sets the session cookie; the Origin header must be the web app's address.
+# @name signin
+POST {{api}}/v1/auth/sign-in/email
+Content-Type: application/json
+Origin: {{origin}}
+
+{ "email": "demo@zindex.test", "password": "zindex-demo-1234" }
+
+### Who am I
+GET {{api}}/v1/me
+
+### Stores
+GET {{api}}/v1/stores
+
+###
+POST {{api}}/v1/stores
+Content-Type: application/json
+
+{ "name": "Sheen Food", "invoicePrefix": "SF", "accent": "#8a3b12", "phone": "0300 1112223" }
+
+### Products (a separate catalogue and price per store)
+GET {{api}}/v1/stores/{{store}}/products?q=masala
+
+###
+POST {{api}}/v1/stores/{{store}}/products
+Content-Type: application/json
+
+{ "name": "Garam masala 100 g", "price": 450, "cost": 300 }
+
+### Stock: counted adjustments go in an append-only ledger
+POST {{api}}/v1/stores/{{store}}/stock/adjust
+Content-Type: application/json
+
+{ "productId": "{{product}}", "delta": 40, "note": "Opening stock" }
+
+###
+GET {{api}}/v1/stores/{{store}}/stock
+
+### Customers (the phone number in any spelling finds the same person)
+GET {{api}}/v1/stores/{{store}}/customers?q=%2B92%20300%201234567
+
+### Create an order. Totals are worked out on the server; the same idempotencyKey never makes a second order.
+POST {{api}}/v1/stores/{{store}}/orders
+Content-Type: application/json
+
+{
+  "customerName": "Ayesha Khan",
+  "customerPhone": "0300 1234567",
+  "address": "House 4, Street 2, Model Town, Lahore",
+  "items": [{ "productId": "{{product}}", "quantity": 2 }, { "name": "Gift wrap", "quantity": 1, "unitPrice": 100 }],
+  "discountPercent": 10,
+  "deliveryKind": "local",
+  "riderFee": 350,
+  "payment": "cod",
+  "idempotencyKey": "demo-key-0001"
+}
+
+### List and search orders
+GET {{api}}/v1/stores/{{store}}/orders?status=pending&q=ayesha
+
+### Move an order one step; confirming is the moment stock is taken out
+POST {{api}}/v1/stores/{{store}}/orders/{{order}}/status
+Content-Type: application/json
+
+{ "status": "confirmed" }
+
+### Put stock back after a cancelled or returned order (only the owner can approve this)
+POST {{api}}/v1/stores/{{store}}/orders/{{order}}/restore-stock
+
+### Invoice: draft, then final (takes the store's next number)
+POST {{api}}/v1/stores/{{store}}/orders/{{order}}/invoice
+
+###
+POST {{api}}/v1/stores/{{store}}/orders/{{order}}/invoice/finalise
+
+###
+GET {{api}}/v1/stores/{{store}}/orders/{{order}}/invoice
+
+### Local delivery: the text to paste into inDrive or Yango, and the rider's details
+GET {{api}}/v1/stores/{{store}}/orders/{{order}}/delivery
+
+###
+PUT {{api}}/v1/stores/{{store}}/orders/{{order}}/delivery
+Content-Type: application/json
+
+{ "service": "yango", "riderName": "Imran", "riderPhone": "0345 5551212", "bikeNumber": "LEA-1234" }
+
+###
+POST {{api}}/v1/stores/{{store}}/orders/{{order}}/delivery/status
+Content-Type: application/json
+
+{ "status": "booked" }
+
+### Payments
+POST {{api}}/v1/stores/{{store}}/orders/{{order}}/payment/confirm
+
+###
+POST {{api}}/v1/stores/{{store}}/orders/{{order}}/payment/cash-handover
+
+###
+GET {{api}}/v1/stores/{{store}}/cod-summary
+
+### Courier parcel, recorded by hand
+PUT {{api}}/v1/stores/{{store}}/orders/{{order}}/shipment
+Content-Type: application/json
+
+{ "courier": "TCS", "trackingNo": "77881234", "trackingUrl": "https://example.com/track/77881234" }
+
+### The customer's delivery card. Make the link, then open it with NO sign-in (it holds only a hash on our side).
+# @name card
+POST {{api}}/v1/stores/{{store}}/orders/{{order}}/card
+Content-Type: application/json
+
+{ "days": 7 }
+
+###
+@token = {{card.response.body.token}}
+GET {{api}}/v1/public/card/{{token}}
+
+### WhatsApp: a ready message and the wa.me link for an order
+GET {{api}}/v1/stores/{{store}}/orders/{{order}}/whatsapp?template=on_the_way
+
+###
+GET {{api}}/v1/stores/{{store}}/templates
+
+### Dashboard and reports
+GET {{api}}/v1/dashboard
+
+###
+GET {{api}}/v1/reports/sales?from=2026-10-01&to=2026-10-31
+
+###
+GET {{api}}/v1/reports/sales?from=2026-10-01&to=2026-10-31&format=csv
+
+###
+GET {{api}}/v1/reports/inventory?format=csv
+
+### Shopify: bring in an orders export (CSV text), and sync products
+POST {{api}}/v1/stores/{{store}}/import/shopify-orders
+Content-Type: text/csv
+
+Name,Email,Financial Status,Shipping,Total,Discount Amount,Lineitem quantity,Lineitem name,Lineitem price,Shipping Name,Shipping Phone
+#1042,a@example.com,paid,250,6750,0,1,Oud Royale 50 ml,6500,Ayesha Khan,0300 1234567
+
+###
+PUT {{api}}/v1/stores/{{store}}/shopify
+Content-Type: application/json
+
+{ "domain": "your-shop.myshopify.com" }
+
+###
+POST {{api}}/v1/stores/{{store}}/shopify/sync
+
+### A complete backup of everything the owner has (one JSON file)
+GET {{api}}/v1/backup

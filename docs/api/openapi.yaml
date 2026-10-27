@@ -1,0 +1,254 @@
+openapi: 3.1.0
+info:
+  title: Zindex API
+  version: 1.0.0
+  description: |
+    The API behind Zindex: orders, invoices, stock and delivery cards for shops that sell on WhatsApp.
+    Everything under /v1 needs a signed-in owner (a session cookie) except the public delivery card
+    and sign-in itself. Every owner's data is separated in the database by row-level security, so a
+    request can only ever see its own owner's rows, whatever ids it sends.
+
+    Money is whole PKR rupees (integers). Totals are always worked out on the server.
+servers:
+  - url: http://127.0.0.1:4000
+    description: Local development
+security:
+  - session: []
+tags:
+  - { name: Account }
+  - { name: Stores }
+  - { name: Catalogue }
+  - { name: Orders }
+  - { name: Invoices }
+  - { name: Delivery }
+  - { name: Money }
+  - { name: Messages }
+  - { name: Reports }
+  - { name: Shopify }
+paths:
+  /health:
+    get:
+      summary: Is the server awake? (also what the keep-awake pinger calls)
+      security: []
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { type: object, properties: { status: { const: ok } } } } } }
+  /v1/auth/sign-up/email:
+    post:
+      tags: [Account]
+      summary: Create an owner account (a confirmation email is sent; sign-in needs the link)
+      security: []
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [name, email, password], properties: { name: { type: string }, email: { type: string, format: email }, password: { type: string, minLength: 10 } } } } } }
+      responses: { "200": { description: Created, check email }, "422": { description: Invalid or already used }, "429": { description: Too many sign-ups (5 a minute) } }
+  /v1/auth/sign-in/email:
+    post:
+      tags: [Account]
+      summary: Sign in; sets the session cookie
+      security: []
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [email, password], properties: { email: { type: string }, password: { type: string } } } } } }
+      responses: { "200": { description: Signed in }, "401": { description: Wrong details }, "403": { description: Email not confirmed yet }, "429": { description: Too many tries (10 a minute) } }
+  /v1/me:
+    get:
+      tags: [Account]
+      summary: The signed-in owner
+      responses: { "200": { description: OK }, "401": { $ref: "#/components/responses/SignIn" } }
+  /v1/backup:
+    get:
+      tags: [Account]
+      summary: Download everything the owner has as one JSON file (never anyone else's data, no passwords)
+      responses: { "200": { description: A JSON file, content: { application/json: { schema: { type: object } } } } }
+  /v1/stores:
+    get: { tags: [Stores], summary: List the owner's stores, responses: { "200": { description: OK } } }
+    post:
+      tags: [Stores]
+      summary: Add a store (the invoice number counter starts at 1 for this store)
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/StoreInput" } } } }
+      responses: { "201": { description: Created }, "409": { description: A store with that name exists } }
+  /v1/stores/{storeId}:
+    parameters: [{ $ref: "#/components/parameters/storeId" }]
+    patch: { tags: [Stores], summary: Edit a store, requestBody: { content: { application/json: { schema: { $ref: "#/components/schemas/StoreInput" } } } }, responses: { "200": { description: OK }, "404": { $ref: "#/components/responses/NotFound" } } }
+    delete: { tags: [Stores], summary: Delete a store and everything in it, responses: { "204": { description: Deleted }, "404": { $ref: "#/components/responses/NotFound" } } }
+  /v1/stores/{storeId}/products:
+    parameters: [{ $ref: "#/components/parameters/storeId" }]
+    get: { tags: [Catalogue], summary: "Search the store's products (?q=)", responses: { "200": { description: OK } } }
+    post:
+      tags: [Catalogue]
+      summary: Add a product (the same name can cost differently in another store)
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [name, price], properties: { name: { type: string }, price: { type: integer, minimum: 0 }, cost: { type: [integer, "null"] }, active: { type: boolean } } } } } }
+      responses: { "201": { description: Created }, "409": { description: Name already in this store } }
+  /v1/stores/{storeId}/products/{id}:
+    parameters: [{ $ref: "#/components/parameters/storeId" }, { name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+    patch: { tags: [Catalogue], summary: Edit a product, responses: { "200": { description: OK } } }
+    delete: { tags: [Catalogue], summary: Delete a product, responses: { "204": { description: Deleted } } }
+  /v1/stores/{storeId}/stock:
+    parameters: [{ $ref: "#/components/parameters/storeId" }]
+    get: { tags: [Catalogue], summary: Every product with units on hand and units sold, responses: { "200": { description: OK } } }
+  /v1/stores/{storeId}/stock/adjust:
+    parameters: [{ $ref: "#/components/parameters/storeId" }]
+    post:
+      tags: [Catalogue]
+      summary: A counted adjustment (append-only ledger; nothing is ever edited or deleted)
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [productId, delta], properties: { productId: { type: string, format: uuid }, delta: { type: integer, description: Not zero }, note: { type: string } } } } } }
+      responses: { "201": { description: Recorded } }
+  /v1/stores/{storeId}/stock/{productId}/history:
+    parameters: [{ $ref: "#/components/parameters/storeId" }, { name: productId, in: path, required: true, schema: { type: string, format: uuid } }]
+    get: { tags: [Catalogue], summary: The product's stock changes, newest first, responses: { "200": { description: OK } } }
+  /v1/stores/{storeId}/customers:
+    parameters: [{ $ref: "#/components/parameters/storeId" }]
+    get: { tags: [Catalogue], summary: "Search by name or any spelling of the phone (?q=)", responses: { "200": { description: OK } } }
+    post: { tags: [Catalogue], summary: Save a customer; the same phone in this store updates the existing one, responses: { "200": { description: Updated }, "201": { description: Created } } }
+  /v1/stores/{storeId}/customers/{id}:
+    parameters: [{ $ref: "#/components/parameters/storeId" }, { name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+    get: { tags: [Catalogue], summary: One customer with their order count, responses: { "200": { description: OK } } }
+    patch: { tags: [Catalogue], summary: Edit, responses: { "200": { description: OK } } }
+    delete: { tags: [Catalogue], summary: Delete, responses: { "204": { description: Deleted } } }
+  /v1/stores/{storeId}/orders:
+    parameters: [{ $ref: "#/components/parameters/storeId" }]
+    get:
+      tags: [Orders]
+      summary: List and search orders
+      parameters:
+        - { name: q, in: query, schema: { type: string }, description: Customer name, phone, or #number }
+        - { name: status, in: query, schema: { $ref: "#/components/schemas/Stage" } }
+        - { name: payment, in: query, schema: { enum: [paid, cod, unpaid] } }
+        - { name: method, in: query, schema: { type: string } }
+      responses: { "200": { description: OK } }
+    post:
+      tags: [Orders]
+      summary: Create an order. The server works out every total; the customer is saved or reused; a repeat of the same idempotencyKey returns the first order.
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/OrderInput" } } } }
+      responses: { "200": { description: The same order again (retry) }, "201": { description: Created }, "400": { description: Invalid amounts or items } }
+  /v1/stores/{storeId}/orders/{orderId}:
+    parameters: [{ $ref: "#/components/parameters/storeId" }, { $ref: "#/components/parameters/orderId" }]
+    get: { tags: [Orders], summary: One order with its items, responses: { "200": { description: OK }, "404": { $ref: "#/components/responses/NotFound" } } }
+    patch: { tags: [Orders], summary: Edit and recalculate; items are locked once confirmed; edits after the invoice is final are logged, responses: { "200": { description: OK }, "409": { description: Locked } } }
+  /v1/stores/{storeId}/orders/{orderId}/status:
+    parameters: [{ $ref: "#/components/parameters/storeId" }, { $ref: "#/components/parameters/orderId" }]
+    post:
+      tags: [Orders]
+      summary: Move one step. Confirming takes stock out once; below zero is allowed and warned about.
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [status], properties: { status: { $ref: "#/components/schemas/Stage" } } } } } }
+      responses: { "200": { description: "{ order, stockWarnings }" }, "409": { description: Not an allowed move } }
+  /v1/stores/{storeId}/orders/{orderId}/restore-stock:
+    parameters: [{ $ref: "#/components/parameters/storeId" }, { $ref: "#/components/parameters/orderId" }]
+    post: { tags: [Orders], summary: Put a cancelled or returned order's stock back (owner approval, once), responses: { "200": { description: OK }, "409": { description: Nothing to put back } } }
+  /v1/stores/{storeId}/orders/{orderId}/invoice:
+    parameters: [{ $ref: "#/components/parameters/storeId" }, { $ref: "#/components/parameters/orderId" }]
+    get: { tags: [Invoices], summary: The invoice with the store's branding and its edit history, responses: { "200": { description: OK }, "404": { description: No invoice yet } } }
+    post: { tags: [Invoices], summary: Make the draft (one per order; asking again returns it), responses: { "200": { description: Already there }, "201": { description: Created } } }
+  /v1/stores/{storeId}/orders/{orderId}/invoice/finalise:
+    parameters: [{ $ref: "#/components/parameters/storeId" }, { $ref: "#/components/parameters/orderId" }]
+    post: { tags: [Invoices], summary: Take the store's next gap-free number (SF-0007); doing it twice changes nothing, responses: { "200": { description: OK } } }
+  /v1/stores/{storeId}/invoices:
+    parameters: [{ $ref: "#/components/parameters/storeId" }]
+    get: { tags: [Invoices], summary: "Search by number, customer or phone (?q=)", responses: { "200": { description: OK } } }
+  /v1/stores/{storeId}/orders/{orderId}/delivery:
+    parameters: [{ $ref: "#/components/parameters/storeId" }, { $ref: "#/components/parameters/orderId" }]
+    get: { tags: [Delivery], summary: The rider's details and the text to paste into inDrive or Yango, responses: { "200": { description: OK } } }
+    put: { tags: [Delivery], summary: Save the rider by hand (only the fields sent change), responses: { "200": { description: OK }, "409": { description: Only local orders have a rider } } }
+  /v1/stores/{storeId}/orders/{orderId}/delivery/status:
+    parameters: [{ $ref: "#/components/parameters/storeId" }, { $ref: "#/components/parameters/orderId" }]
+    post: { tags: [Delivery], summary: "pending, booked, picked_up, delivered: only forward", responses: { "200": { description: OK }, "409": { description: Not forward } } }
+  /v1/stores/{storeId}/orders/{orderId}/shipment:
+    parameters: [{ $ref: "#/components/parameters/storeId" }, { $ref: "#/components/parameters/orderId" }]
+    get: { tags: [Delivery], summary: The courier parcel, responses: { "200": { description: OK } } }
+    put: { tags: [Delivery], summary: Record or edit the parcel by hand (no courier integration), responses: { "200": { description: OK }, "409": { description: Duplicate tracking number or not a courier order } } }
+  /v1/stores/{storeId}/orders/{orderId}/shipment/status:
+    parameters: [{ $ref: "#/components/parameters/storeId" }, { $ref: "#/components/parameters/orderId" }]
+    post: { tags: [Delivery], summary: "shipped, delayed, delivered, returned, failed (a reason for failed or returned)", responses: { "200": { description: OK } } }
+  /v1/stores/{storeId}/shipments:
+    parameters: [{ $ref: "#/components/parameters/storeId" }]
+    get: { tags: [Delivery], summary: "The store's parcels (?status=)", responses: { "200": { description: OK } } }
+  /v1/stores/{storeId}/orders/{orderId}/card:
+    parameters: [{ $ref: "#/components/parameters/storeId" }, { $ref: "#/components/parameters/orderId" }]
+    post: { tags: [Delivery], summary: "Make the customer's delivery card link (1 to 30 days, default 7); an earlier link stops working. The token is shown once; only its hash is stored.", responses: { "201": { description: "{ token, url, expiresAt }" } } }
+    delete: { tags: [Delivery], summary: Switch the link off, responses: { "200": { description: "{ revoked }" } } }
+  /v1/public/card/{token}:
+    get:
+      tags: [Delivery]
+      summary: The delivery card, for the customer. No sign-in; rate limited; never cached; no customer phone in it.
+      security: []
+      parameters: [{ name: token, in: path, required: true, schema: { type: string } }]
+      responses: { "200": { description: The card }, "404": { description: Wrong, expired or switched off }, "429": { description: Too many requests } }
+  /v1/stores/{storeId}/orders/{orderId}/payment/confirm:
+    parameters: [{ $ref: "#/components/parameters/storeId" }, { $ref: "#/components/parameters/orderId" }]
+    post: { tags: [Money], summary: "I can see the advance payment (payment is never marked received by itself)", responses: { "200": { description: OK } } }
+  /v1/stores/{storeId}/orders/{orderId}/payment/cash-handover:
+    parameters: [{ $ref: "#/components/parameters/storeId" }, { $ref: "#/components/parameters/orderId" }]
+    post: { tags: [Money], summary: The rider handed over the COD cash (settles the order), responses: { "200": { description: OK } } }
+  /v1/stores/{storeId}/orders/{orderId}/payment:
+    parameters: [{ $ref: "#/components/parameters/storeId" }, { $ref: "#/components/parameters/orderId" }]
+    delete: { tags: [Money], summary: Correct a mistake: not received after all, responses: { "200": { description: OK } } }
+  /v1/stores/{storeId}/cod-summary:
+    parameters: [{ $ref: "#/components/parameters/storeId" }]
+    get: { tags: [Money], summary: Cash expected, handed over and still with riders, responses: { "200": { description: OK } } }
+  /v1/stores/{storeId}/templates:
+    parameters: [{ $ref: "#/components/parameters/storeId" }]
+    get: { tags: [Messages], summary: The seven WhatsApp templates (the store's wording or the default), responses: { "200": { description: OK } } }
+  /v1/stores/{storeId}/templates/{key}:
+    parameters: [{ $ref: "#/components/parameters/storeId" }, { name: key, in: path, required: true, schema: { type: string } }]
+    put: { tags: [Messages], summary: Change this store's wording, responses: { "200": { description: OK } } }
+    delete: { tags: [Messages], summary: Back to the default, responses: { "200": { description: OK } } }
+  /v1/stores/{storeId}/orders/{orderId}/whatsapp:
+    parameters: [{ $ref: "#/components/parameters/storeId" }, { $ref: "#/components/parameters/orderId" }, { name: template, in: query, required: true, schema: { type: string } }, { name: link, in: query, schema: { type: string } }]
+    get: { tags: [Messages], summary: "The filled message and a wa.me link (no WhatsApp Business API)", responses: { "200": { description: "{ text, waLink }" } } }
+  /v1/dashboard:
+    get: { tags: [Reports], summary: Counts per store and combined, and what needs action today, responses: { "200": { description: OK } } }
+  /v1/reports/sales:
+    get:
+      tags: [Reports]
+      summary: Sales for a date range (Pakistan dates), per store and combined, with best sellers
+      parameters:
+        - { name: from, in: query, schema: { type: string, format: date } }
+        - { name: to, in: query, schema: { type: string, format: date } }
+        - { name: storeId, in: query, schema: { type: string, format: uuid } }
+        - { name: format, in: query, schema: { enum: [csv] } }
+      responses: { "200": { description: JSON or a CSV file for Excel }, "400": { description: Bad dates } }
+  /v1/reports/inventory:
+    get: { tags: [Reports], summary: Stock per product, per store or combined (?format=csv for Excel), responses: { "200": { description: OK } } }
+  /v1/stores/{storeId}/import/shopify-orders:
+    parameters: [{ $ref: "#/components/parameters/storeId" }]
+    post:
+      tags: [Shopify]
+      summary: Bring in a Shopify "Export orders" CSV as pending orders with draft invoices. The same file twice adds nothing; stock never moves.
+      requestBody: { required: true, content: { text/csv: { schema: { type: string } } } }
+      responses: { "200": { description: "{ imported, alreadyImported, skipped, warnings }" }, "400": { description: Not a Shopify export } }
+  /v1/stores/{storeId}/shopify:
+    parameters: [{ $ref: "#/components/parameters/storeId" }]
+    get: { tags: [Shopify], summary: Is this store connected to Shopify?, responses: { "200": { description: OK } } }
+    put: { tags: [Shopify], summary: Name the store's .myshopify.com address, responses: { "200": { description: OK } } }
+  /v1/stores/{storeId}/shopify/sync:
+    parameters: [{ $ref: "#/components/parameters/storeId" }]
+    post: { tags: [Shopify], summary: Pull names, prices and images (read only; never stock). If Shopify fails nothing changes., responses: { "200": { description: "{ added, updated, linked, skipped, total }" }, "409": { description: Not set up }, "502": { description: Shopify did not answer } } }
+components:
+  securitySchemes:
+    session: { type: apiKey, in: cookie, name: better-auth.session_token, description: Set by sign-in }
+  parameters:
+    storeId: { name: storeId, in: path, required: true, schema: { type: string, format: uuid } }
+    orderId: { name: orderId, in: path, required: true, schema: { type: string, format: uuid } }
+  responses:
+    SignIn: { description: Please sign in }
+    NotFound: { description: Not found (also what another owner's id looks like) }
+  schemas:
+    Stage: { enum: [pending, confirmed, packed, out_for_delivery, delivered, returned, cancelled] }
+    StoreInput:
+      type: object
+      properties: { name: { type: string }, phone: { type: string }, address: { type: string }, accent: { type: string, pattern: "^#[0-9a-fA-F]{6}$" }, invoicePrefix: { type: string, pattern: "^[A-Z0-9]{1,8}$" } }
+    OrderInput:
+      type: object
+      required: [customerName, items]
+      additionalProperties: false
+      properties:
+        customerName: { type: string }
+        customerPhone: { type: string }
+        address: { type: [string, "null"] }
+        items:
+          type: array
+          items: { type: object, properties: { productId: { type: string, format: uuid }, name: { type: string }, quantity: { type: integer, minimum: 1 }, unitPrice: { type: integer, minimum: 0 } }, required: [quantity] }
+        discountPercent: { type: integer, minimum: 0, maximum: 100 }
+        deliveryKind: { enum: [local, courier, pickup] }
+        deliveryCharge: { type: integer, description: The store's flat courier fee (part of the total) }
+        riderFee: { type: integer, description: Paid by the recipient straight to the rider; never part of the total }
+        payment: { enum: [paid, cod, unpaid] }
+        paymentMethod: { type: [string, "null"] }
+        notes: { type: [string, "null"] }
+        idempotencyKey: { type: string, minLength: 8 }
