@@ -8,6 +8,7 @@ import { invoicesRouter, orderInvoiceRouter } from "./invoices";
 import { ordersRouter } from "./orders";
 import { paymentsRouter } from "./payments";
 import { productsRouter } from "./products";
+import { shipmentRouter, shipmentsListRouter } from "./shipments";
 import { requireUser } from "./require-user";
 import { stockRouter } from "./stock";
 import { storesRouter } from "./stores";
@@ -26,6 +27,8 @@ export function createRoutes(ctx: AppContext): Router {
   router.use("/stores/:storeId/orders/:orderId/invoice", orderInvoiceRouter(ctx.db));
   router.use("/stores/:storeId/orders/:orderId/delivery", deliveriesRouter(ctx.db));
   router.use("/stores/:storeId/orders/:orderId/card", cardsRouter(ctx.db, ctx.config));
+  router.use("/stores/:storeId/orders/:orderId/shipment", shipmentRouter(ctx.db));
+  router.use("/stores/:storeId/shipments", shipmentsListRouter(ctx.db));
   router.use("/stores/:storeId/invoices", invoicesRouter(ctx.db));
   router.use("/stores/:storeId", paymentsRouter(ctx.db));
   router.use("/stores/:storeId", whatsappRouter(ctx.db));
