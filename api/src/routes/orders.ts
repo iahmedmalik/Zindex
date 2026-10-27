@@ -89,6 +89,7 @@ export type Order = {
   notes: string | null;
   stockApplied: boolean;
   paymentConfirmedAt: Date | null;
+  externalRef: string | null;
   createdAt: Date;
   updatedAt: Date;
   items: OrderItem[];
@@ -97,7 +98,7 @@ export type Order = {
 const orderSelect = sql`
   o.id, o.store_id, o.order_no, o.customer_id, o.customer_name, o.customer_phone, o.address, o.source, o.status,
   o.delivery_kind, o.payment, o.payment_method, o.discount_percent, o.delivery_charge, o.rider_fee, o.subtotal,
-  o.discount, o.total, o.cod_amount, o.collect_at_door, o.amount_due, o.notes, o.stock_applied, o.payment_confirmed_at, o.created_at, o.updated_at,
+  o.discount, o.total, o.cod_amount, o.collect_at_door, o.amount_due, o.notes, o.stock_applied, o.payment_confirmed_at, o.external_ref, o.created_at, o.updated_at,
   coalesce((select json_agg(json_build_object('id', i.id, 'productId', i.product_id, 'name', i.name,
                                               'quantity', i.quantity, 'unitPrice', i.unit_price) order by i.position)
               from order_items i where i.order_id = o.id), '[]'::json) as items`;
@@ -166,6 +167,30 @@ async function writeItems(tx: Tx, orderId: string, items: Resolved[]) {
   }
 }
 
+export type NewOrder = Omit<z.infer<typeof createBody>, "source" | "idempotencyKey"> & { source?: "whatsapp" | "manual" | "shopify"; externalRef?: string | null };
+
+/** Saves one new order: resolves the items, works out the totals, saves the customer and takes the next order number. */
+export async function insertOrder(tx: Tx, storeId: string, b: NewOrder, key: string | null = null): Promise<string> {
+  const items = await resolveItems(tx, storeId, b.items);
+  const v = { discountPercent: b.discountPercent ?? 0, deliveryCharge: b.deliveryCharge ?? 0, riderFee: b.riderFee ?? 0, payment: b.payment ?? "cod" };
+  const t = totalsFor(items, v);
+  const phone = b.customerPhone ?? null;
+  const customerId = await saveCustomer(tx, storeId, b.customerName, phone, b.address ?? null);
+  const orderNo = (await rows<{ orderNo: number }>(tx, sql`select allocate_order_no(${storeId}) as order_no`))[0]!.orderNo;
+  const id = (await rows<{ id: string }>(
+    tx,
+    sql`insert into orders (store_id, order_no, customer_id, customer_name, customer_phone, address, source, delivery_kind, payment,
+          payment_method, discount_percent, delivery_charge, rider_fee, subtotal, discount, total, cod_amount, collect_at_door,
+          amount_due, notes, idempotency_key, external_ref)
+        values (${storeId}, ${orderNo}, ${customerId}, ${b.customerName}, ${phone}, ${b.address ?? null}, ${b.source ?? "whatsapp"},
+          ${b.deliveryKind ?? "local"}, ${v.payment}, ${b.paymentMethod ?? null}, ${v.discountPercent}, ${v.deliveryCharge}, ${v.riderFee},
+          ${t.subtotal}, ${t.discount}, ${t.total}, ${t.codAmount}, ${t.collectAtDoor}, ${t.amountDue}, ${b.notes ?? null}, ${key}, ${b.externalRef ?? null})
+        returning id`,
+  ))[0]!.id;
+  await writeItems(tx, id, items);
+  return id;
+}
+
 // Mounted at /v1/stores/:storeId/orders
 export function ordersRouter(db: Db): Router {
   const router = Router({ mergeParams: true });
@@ -214,23 +239,7 @@ export function ordersRouter(db: Db): Router {
         const [again] = await existing(tx);
         if (again) return { order: await loadOrder(tx, storeId, again.id), created: false };
 
-        const items = await resolveItems(tx, storeId, b.items);
-        const v = { discountPercent: b.discountPercent ?? 0, deliveryCharge: b.deliveryCharge ?? 0, riderFee: b.riderFee ?? 0, payment: b.payment ?? "cod" };
-        const t = totalsFor(items, v);
-        const phone = b.customerPhone ?? null;
-        const customerId = await saveCustomer(tx, storeId, b.customerName, phone, b.address ?? null);
-        const orderNo = (await rows<{ orderNo: number }>(tx, sql`select allocate_order_no(${storeId}) as order_no`))[0]!.orderNo;
-        const id = (await rows<{ id: string }>(
-          tx,
-          sql`insert into orders (store_id, order_no, customer_id, customer_name, customer_phone, address, source, delivery_kind, payment,
-                payment_method, discount_percent, delivery_charge, rider_fee, subtotal, discount, total, cod_amount, collect_at_door,
-                amount_due, notes, idempotency_key)
-              values (${storeId}, ${orderNo}, ${customerId}, ${b.customerName}, ${phone}, ${b.address ?? null}, ${b.source ?? "whatsapp"},
-                ${b.deliveryKind ?? "local"}, ${v.payment}, ${b.paymentMethod ?? null}, ${v.discountPercent}, ${v.deliveryCharge}, ${v.riderFee},
-                ${t.subtotal}, ${t.discount}, ${t.total}, ${t.codAmount}, ${t.collectAtDoor}, ${t.amountDue}, ${b.notes ?? null}, ${key})
-              returning id`,
-        ))[0]!.id;
-        await writeItems(tx, id, items);
+        const id = await insertOrder(tx, storeId, b, key);
         return { order: await loadOrder(tx, storeId, id), created: true };
       });
       res.status(result.created ? 201 : 200).json({ order: result.order });
