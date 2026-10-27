@@ -23,6 +23,8 @@ const putBody = z
       .nullable(),
     bikeNumber: z.string().trim().min(1).max(20).nullable(),
     riderPhotoUrl: link.nullable(),
+    riderPhotoTakenAt: z.string().datetime().nullable(),
+    trackingUrl: link.nullable(),
     riderScreenshotUrl: link.nullable(),
     pickupAddress: z.string().trim().max(300).nullable(),
     notes: z.string().trim().max(300).nullable(),
@@ -41,6 +43,8 @@ export type Delivery = {
   riderPhone: string | null;
   bikeNumber: string | null;
   riderPhotoUrl: string | null;
+  riderPhotoTakenAt: Date | null;
+  trackingUrl: string | null;
   riderScreenshotUrl: string | null;
   pickupAddress: string | null;
   notes: string | null;
@@ -49,7 +53,7 @@ export type Delivery = {
   cashHandedAt: Date | null;
 };
 
-const cols = sql`id, order_id, service, rider_name, rider_phone, bike_number, rider_photo_url, rider_screenshot_url, pickup_address, notes, status, cash_handed_over, cash_handed_at`;
+const cols = sql`id, order_id, service, rider_name, rider_phone, bike_number, rider_photo_url, rider_photo_taken_at, tracking_url, rider_screenshot_url, pickup_address, notes, status, cash_handed_over, cash_handed_at`;
 
 const maps = (address: string) => `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
 const pkr = (n: number) => `PKR ${n.toLocaleString("en-US")}`;
@@ -114,6 +118,8 @@ export function deliveriesRouter(db: Db): Router {
               rider_phone = case when ${has("riderPhone")} then ${b.riderPhone ?? null} else rider_phone end,
               bike_number = case when ${has("bikeNumber")} then ${b.bikeNumber ?? null} else bike_number end,
               rider_photo_url = case when ${has("riderPhotoUrl")} then ${b.riderPhotoUrl ?? null} else rider_photo_url end,
+              rider_photo_taken_at = case when ${has("riderPhotoTakenAt")} then ${b.riderPhotoTakenAt ?? null}::timestamptz else rider_photo_taken_at end,
+              tracking_url = case when ${has("trackingUrl")} then ${b.trackingUrl ?? null} else tracking_url end,
               rider_screenshot_url = case when ${has("riderScreenshotUrl")} then ${b.riderScreenshotUrl ?? null} else rider_screenshot_url end,
               pickup_address = case when ${has("pickupAddress")} then ${b.pickupAddress ?? null} else pickup_address end,
               notes = case when ${has("notes")} then ${b.notes ?? null} else notes end,

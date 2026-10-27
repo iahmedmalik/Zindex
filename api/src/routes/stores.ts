@@ -13,6 +13,7 @@ const createBody = z
   .object({
     name: z.string().trim().min(1).max(80),
     phone: z.string().trim().max(30).optional(),
+    email: z.string().trim().max(120).email("enter a valid email address").optional(),
     address: z.string().trim().max(300).optional(),
     accent: colour.optional(),
     invoicePrefix: prefix.optional(),
@@ -26,6 +27,7 @@ const columns = {
   id: stores.id,
   name: stores.name,
   phone: stores.phone,
+  email: stores.email,
   address: stores.address,
   logoUrl: stores.logoUrl,
   accent: stores.accent,
@@ -56,6 +58,7 @@ export function storesRouter(db: Db): Router {
       const given = [
         ["name", body.name],
         ["phone", body.phone],
+        ["email", body.email],
         ["address", body.address],
         ["accent", body.accent],
         ["invoice_prefix", body.invoicePrefix],
@@ -65,7 +68,7 @@ export function storesRouter(db: Db): Router {
       const result = await asOwner(db, req.user!.id, (tx) =>
         tx.execute(sql`
           insert into stores (${sql.join(names, sql`, `)}) values (${sql.join(values, sql`, `)})
-          returning id, name, phone, address, logo_url as "logoUrl", accent, invoice_prefix as "invoicePrefix", created_at as "createdAt"`),
+          returning id, name, phone, email, address, logo_url as "logoUrl", accent, invoice_prefix as "invoicePrefix", created_at as "createdAt"`),
       );
       res.status(201).json({ store: result.rows[0] });
     } catch (err) {

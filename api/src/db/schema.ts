@@ -76,6 +76,7 @@ export const stores = pgTable(
       .references(() => user.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
     phone: text("phone"),
+    email: text("email"),
     address: text("address"),
     logoUrl: text("logo_url"),
     accent: text("accent").notNull().default("#5d1b23"),
