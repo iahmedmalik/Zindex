@@ -7,10 +7,10 @@ export type Accent = "maroon" | "forest" | "indigo" | "saffron";
 export type Motion = "full" | "reduced" | "system";
 
 export const accents: Record<Accent, { name: string; light: string; dark: string; soft: string; softDark: string }> = {
-  maroon: { name: "Maroon", light: "#5d1b23", dark: "#d98a94", soft: "#ead9d6", softDark: "#3a2327" },
-  forest: { name: "Forest", light: "#24523b", dark: "#86c7a2", soft: "#d8e6dc", softDark: "#1e3328" },
-  indigo: { name: "Indigo", light: "#2b3f7a", dark: "#9db0ec", soft: "#dce1f1", softDark: "#232a45" },
-  saffron: { name: "Saffron", light: "#8a3b12", dark: "#e39a6f", soft: "#f1dfd3", softDark: "#3a2519" },
+  maroon: { name: "Maroon", light: "#5d1b23", dark: "#8a2a3b", soft: "#ead9d6", softDark: "#2b1519" },
+  forest: { name: "Forest", light: "#24523b", dark: "#2f6b4d", soft: "#d8e6dc", softDark: "#14261d" },
+  indigo: { name: "Indigo", light: "#2b3f7a", dark: "#3a52a0", soft: "#dce1f1", softDark: "#171c33" },
+  saffron: { name: "Saffron", light: "#8a3b12", dark: "#a34a1c", soft: "#f1dfd3", softDark: "#2b1a10" },
 };
 
 const KEY = "zindex.appearance";

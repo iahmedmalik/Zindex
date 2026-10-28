@@ -1,16 +1,17 @@
 /* App-only additions on top of globals.css: accent themes, loading and empty states, tables. */
 
-/* Settings > Appearance accents. Maroon is the default in globals.css. */
+/* Settings > Appearance accents. Maroon is the default in globals.css.
+   --brand is the fill (buttons, hero, chips: white text on it); --brand-hi is the same colour brightened for icons and lines on a dark screen. */
 :root[data-accent="forest"] { --brand: #24523b; --brand-soft: #d8e6dc; }
 :root[data-accent="indigo"] { --brand: #2b3f7a; --brand-soft: #dce1f1; }
 :root[data-accent="saffron"] { --brand: #8a3b12; --brand-soft: #f1dfd3; }
-:root[data-theme="dark"][data-accent="forest"] { --brand: #86c7a2; --brand-soft: #1e3328; }
-:root[data-theme="dark"][data-accent="indigo"] { --brand: #9db0ec; --brand-soft: #232a45; }
-:root[data-theme="dark"][data-accent="saffron"] { --brand: #e39a6f; --brand-soft: #3a2519; }
+:root[data-theme="dark"][data-accent="forest"] { --brand: #2f6b4d; --brand-hi: #4fa377; --route: #4fa377; --brand-soft: #14261d; }
+:root[data-theme="dark"][data-accent="indigo"] { --brand: #3a52a0; --brand-hi: #6f86d8; --route: #6f86d8; --brand-soft: #171c33; }
+:root[data-theme="dark"][data-accent="saffron"] { --brand: #a34a1c; --brand-hi: #d9783f; --route: #d9783f; --brand-soft: #2b1a10; }
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme])[data-accent="forest"] { --brand: #86c7a2; --brand-soft: #1e3328; }
-  :root:not([data-theme])[data-accent="indigo"] { --brand: #9db0ec; --brand-soft: #232a45; }
-  :root:not([data-theme])[data-accent="saffron"] { --brand: #e39a6f; --brand-soft: #3a2519; }
+  :root:not([data-theme])[data-accent="forest"] { --brand: #2f6b4d; --brand-hi: #4fa377; --route: #4fa377; --brand-soft: #14261d; }
+  :root:not([data-theme])[data-accent="indigo"] { --brand: #3a52a0; --brand-hi: #6f86d8; --route: #6f86d8; --brand-soft: #171c33; }
+  :root:not([data-theme])[data-accent="saffron"] { --brand: #a34a1c; --brand-hi: #d9783f; --route: #d9783f; --brand-soft: #2b1a10; }
   :root:not([data-theme]) { --shadow-sheet: 0 -8px 32px -8px rgb(0 0 0 / 0.6), 0 -1px 0 rgb(255 255 255 / 0.05); --shadow-pop: 0 12px 32px -8px rgb(0 0 0 / 0.7), 0 2px 6px rgb(0 0 0 / 0.4); }
 }
 
@@ -31,10 +32,10 @@
 .paper { background: var(--surface); border-radius: var(--r-lg); padding: 16px; font-size: var(--t-sm); line-height: 1.55; overflow-wrap: anywhere; }
 .paper.pre { white-space: pre-wrap; }
 .well { background: var(--surface); border-radius: var(--r-lg); padding: 18px; display: grid; gap: 14px; }
-.iconbtn { width: 44px; height: 44px; flex: none; border-radius: var(--r-md); border: 1px solid var(--line); background: var(--surface); display: inline-grid; place-items: center; color: var(--brand); cursor: pointer; text-decoration: none; transition: transform var(--t-press) var(--ease), background var(--t-base) var(--ease); }
+.iconbtn { width: 44px; height: 44px; flex: none; border-radius: var(--r-md); border: 1px solid var(--line); background: var(--surface); display: inline-grid; place-items: center; color: var(--brand-fg); cursor: pointer; text-decoration: none; transition: transform var(--t-press) var(--ease), background var(--t-base) var(--ease); }
 .iconbtn:hover { background: var(--brand-soft); }
 .iconbtn:active { transform: scale(0.94); }
-.linkbtn { border: 0; background: none; padding: 0; color: var(--brand); font-weight: 600; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+.linkbtn { border: 0; background: none; padding: 0; color: var(--brand-fg); font-weight: 600; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
 .stage { width: 10px; height: 10px; border-radius: 50%; flex: none; }
 .stage.pending { background: var(--warn); } .stage.confirmed, .stage.packed { background: var(--brand); } .stage.out_for_delivery { background: var(--ok); }
 .stage.delivered, .stage.cancelled { background: var(--line); } .stage.returned { background: var(--bad); }
@@ -149,10 +150,10 @@
 /* Grid columns must be allowed to shrink below their content, or one long link widens the whole page. */
 .page, .stack, .section, .heading, .well, .side, .split > div { grid-template-columns: minmax(0, 1fr); }
 
-/* A screen about one store takes that store's colour; on the dark theme it is lightened to stay readable. */
+/* A screen about one store takes that store's colour. On the dark theme only its lightness is lifted (same hue, same strength), so a maroon store stays maroon-red and never turns pink. */
 .store-scope { --store: var(--store-base, var(--brand)); }
-:root[data-theme="dark"] .store-scope { --store: color-mix(in srgb, var(--store-base, var(--brand)) 45%, #fff); }
-@media (prefers-color-scheme: dark) { :root:not([data-theme]) .store-scope { --store: color-mix(in srgb, var(--store-base, var(--brand)) 45%, #fff); } }
+:root[data-theme="dark"] .store-scope { --store: color-mix(in srgb, var(--store-base, var(--brand)) 70%, #fff); --store: oklch(from var(--store-base, var(--brand)) max(l, 0.58) c h); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme]) .store-scope { --store: color-mix(in srgb, var(--store-base, var(--brand)) 70%, #fff); --store: oklch(from var(--store-base, var(--brand)) max(l, 0.58) c h); } }
 
 /* ---------- the customer's delivery card: store colour page, white cards, a receipt for the money ---------- */
 .dcard { --brand: var(--store-base); background: var(--store-base); color: #fff; min-height: 100dvh; }
@@ -203,7 +204,7 @@
 /* the rider photo row on an order */
 .photo-row { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: var(--r-lg); background: var(--paper-2); flex-wrap: wrap; }
 .photo-row .grow { flex: 1; min-width: 140px; }
-.photo-ic { width: 40px; height: 40px; border-radius: 12px; background: var(--surface); display: grid; place-items: center; color: var(--brand); }
+.photo-ic { width: 40px; height: 40px; border-radius: 12px; background: var(--surface); display: grid; place-items: center; color: var(--brand-hi); }
 
 /* The wordmark on the sign-in page arrives after the logo has drawn itself. */
 .word { font-family: var(--font-display); font-weight: 600; font-size: 2.2rem; letter-spacing: -0.03em; animation: arrive var(--t-enter) var(--ease) 1.1s both; }
