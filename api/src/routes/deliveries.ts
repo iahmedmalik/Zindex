@@ -32,9 +32,6 @@ const putBody = z
   .partial()
   .strict();
 
-const statusBody = z.object({ status: z.enum(["pending", "booked", "picked_up", "delivered"]) }).strict();
-const order = ["pending", "booked", "picked_up", "delivered"] as const;
-
 export type Delivery = {
   id: string;
   orderId: string;
@@ -49,12 +46,11 @@ export type Delivery = {
   riderScreenshotUrl: string | null;
   pickupAddress: string | null;
   notes: string | null;
-  status: (typeof order)[number];
   cashHandedOver: boolean;
   cashHandedAt: Date | null;
 };
 
-const cols = sql`id, order_id, service, rider_name, rider_phone, bike_number, rider_photo_url, rider_photo_taken_at, tracking_url, rider_screenshot_url, pickup_address, notes, status, cash_handed_over, cash_handed_at, exists (select 1 from delivery_photos p where p.delivery_id = deliveries.id) as has_photo`;
+const cols = sql`id, order_id, service, rider_name, rider_phone, bike_number, rider_photo_url, rider_photo_taken_at, tracking_url, rider_screenshot_url, pickup_address, notes, cash_handed_over, cash_handed_at, exists (select 1 from delivery_photos p where p.delivery_id = deliveries.id) as has_photo`;
 
 const maps = (address: string) => `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
 const pkr = (n: number) => `PKR ${n.toLocaleString("en-US")}`;
@@ -77,11 +73,11 @@ export function copyText(o: Order, store: { name: string; address: string | null
 
 async function loadDelivery(tx: Tx, orderId: string) {
   const [delivery] = await rows<Delivery>(tx, sql`select ${cols} from deliveries where order_id = ${orderId}`);
-  const events = delivery ? await rows(tx, sql`select status, created_at from delivery_events where delivery_id = ${delivery.id} order by created_at, id`) : [];
-  return { delivery: delivery ?? null, events };
+  return { delivery: delivery ?? null };
 }
 
-// Mounted at /v1/stores/:storeId/orders/:orderId/delivery
+// Mounted at /v1/stores/:storeId/orders/:orderId/delivery. The rider is optional details for the owner and the card;
+// the order's own status (orders.ts) is the only status, so nothing here moves an order along.
 export function deliveriesRouter(db: Db): Router {
   const router = Router({ mergeParams: true });
 
@@ -127,19 +123,6 @@ export function deliveriesRouter(db: Db): Router {
               updated_at = now()
             where order_id = ${orderId}`,
       );
-      return loadDelivery(tx, orderId);
-    });
-    res.json(result);
-  });
-
-  router.post("/status", validateBody(statusBody), async (req, res) => {
-    const { status } = req.body as z.infer<typeof statusBody>;
-    const result = await withOrder(req, async (tx, _o, _storeId, orderId) => {
-      const { delivery } = await loadDelivery(tx, orderId);
-      if (!delivery) throw new HttpError(404, "Save the rider details first.");
-      if (order.indexOf(status) <= order.indexOf(delivery.status)) throw new HttpError(409, `The delivery is already ${delivery.status.replace(/_/g, " ")}.`);
-      await tx.execute(sql`update deliveries set status = ${status}, updated_at = now() where id = ${delivery.id}`);
-      await tx.execute(sql`insert into delivery_events (delivery_id, status) values (${delivery.id}, ${status})`);
       return loadDelivery(tx, orderId);
     });
     res.json(result);

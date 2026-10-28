@@ -145,9 +145,6 @@ paths:
     parameters: [{ $ref: "#/components/parameters/storeId" }, { $ref: "#/components/parameters/orderId" }]
     get: { tags: [Delivery], summary: The rider's details and the text to paste into inDrive or Yango, responses: { "200": { description: OK } } }
     put: { tags: [Delivery], summary: Save the rider by hand (only the fields sent change), responses: { "200": { description: OK }, "409": { description: Only local orders have a rider } } }
-  /v1/stores/{storeId}/orders/{orderId}/delivery/status:
-    parameters: [{ $ref: "#/components/parameters/storeId" }, { $ref: "#/components/parameters/orderId" }]
-    post: { tags: [Delivery], summary: "pending, booked, picked_up, delivered: only forward", responses: { "200": { description: OK }, "409": { description: Not forward } } }
   /v1/stores/{storeId}/orders/{orderId}/shipment:
     parameters: [{ $ref: "#/components/parameters/storeId" }, { $ref: "#/components/parameters/orderId" }]
     get: { tags: [Delivery], summary: The courier parcel, responses: { "200": { description: OK } } }

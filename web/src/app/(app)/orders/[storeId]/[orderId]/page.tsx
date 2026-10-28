@@ -22,7 +22,7 @@ const next: Partial<Record<Stage, { to: Stage; label: string }>> = {
 const templates = [["order_confirmed", "Order confirmed"], ["invoice", "Invoice"], ["rider_assigned", "Rider assigned"], ["on_the_way", "On the way"], ["delivered", "Delivered"], ["payment_reminder", "Payment reminder"], ["thank_you", "Thank you"]] as const;
 const shipStatuses = [["shipped", "Shipped"], ["delayed", "Delayed"], ["delivered", "Delivered"], ["returned", "Returned"], ["failed", "Failed"]] as const;
 
-type DeliveryState = { delivery: Delivery | null; events: { status: string; createdAt: string }[]; copyText: string };
+type DeliveryState = { delivery: Delivery | null; copyText: string };
 type Shipment = { courier: string; trackingNo: string | null; trackingUrl: string | null; shippedOn: string | null; status: string; failureReason: string | null };
 const wa = (phone: string | null) => (phone ? `https://wa.me/${phone.replace(/^0/, "92")}` : null);
 const orNull = (v: string) => (v.trim() ? v.trim() : null);
@@ -114,7 +114,7 @@ export default function OrderPage() {
         <div className="stack" style={{ gap: 28 }}>
           {order.deliveryKind === "local" && !closed && del && (
             <section className="section">
-              <header><h2>Rider</h2>{del.delivery?.riderName ? <span className="badge ok">{del.delivery.riderName}{del.delivery.service ? ` · ${del.delivery.service === "indrive" ? "inDrive" : "Yango"}` : ""}</span> : <span className="badge warn">Not booked</span>}</header>
+              <header><h2>Rider</h2>{del.delivery?.riderName ? <span className="badge ok">{del.delivery.riderName}{del.delivery.service ? ` · ${del.delivery.service === "indrive" ? "inDrive" : "Yango"}` : ""}</span> : <span className="badge">No rider added</span>}</header>
               <div className="paper pre">{del.copyText}</div>
               <DoneButton className="btn quiet" done="Copied" onClick={async () => { await copy(del.copyText); toast("Copied. Paste it into inDrive or Yango."); }}><Icon name="copy" size={18} />Copy for inDrive / Yango</DoneButton>
               <Seg label="App" value={rider.service} onChange={(v) => setRider({ ...rider, service: v })} options={[["yango", "Yango"], ["indrive", "inDrive"]] as const} />
@@ -140,16 +140,6 @@ export default function OrderPage() {
               <DoneButton done="Rider saved" disabled={busy} onClick={() => run(async () => {
                 await api(`${base}/delivery`, { method: "PUT", body: { service: rider.service, riderName: orNull(rider.riderName), riderPhone: orNull(rider.riderPhone), bikeNumber: orNull(rider.bikeNumber), trackingUrl: orNull(rider.trackingUrl) } });
               })}>Save rider</DoneButton>
-              {del.delivery && del.delivery.status !== "delivered" && (
-                <div className="inline">
-                  <span className="note">Ride: {del.delivery.status.replace("_", " ")}</span>
-                  {(() => {
-                    const ride = ["pending", "booked", "picked_up", "delivered"] as const;
-                    const s = ride[ride.indexOf(del.delivery!.status) + 1];
-                    return s ? <button className="btn small quiet" disabled={busy} onClick={() => run(async () => { await api(`${base}/delivery/status`, { method: "POST", body: { status: s } }); return `Ride marked ${s.replace("_", " ")}`; })}>Mark {s.replace("_", " ")}</button> : null;
-                  })()}
-                </div>
-              )}
             </section>
           )}
 

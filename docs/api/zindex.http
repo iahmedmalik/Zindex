@@ -97,12 +97,6 @@ Content-Type: application/json
 
 { "service": "yango", "riderName": "Imran", "riderPhone": "0345 5551212", "bikeNumber": "LEA-1234" }
 
-###
-POST {{api}}/v1/stores/{{store}}/orders/{{order}}/delivery/status
-Content-Type: application/json
-
-{ "status": "booked" }
-
 ### Payments
 POST {{api}}/v1/stores/{{store}}/orders/{{order}}/payment/confirm
 

@@ -18,6 +18,17 @@ const api = (cookie: string) => {
 };
 
 describe("dashboard", () => {
+  it("counts a packed local order as awaiting a rider until a rider name is saved", async () => {
+    const o = await newVerifiedOwner(t.app, t.mailer);
+    const a = api(o.cookie);
+    const store = await a.store("Food");
+    const order = await a.order(store);
+    for (const s of ["confirmed", "packed"]) await a.status(store, order, s);
+    expect((await a.board()).body.totals.awaitingRider).toBe(1);
+    await a.rider(store, order);
+    expect((await a.board()).body.totals.awaitingRider).toBe(0);
+  });
+
   it("counts every store separately and together, and says what needs action", async () => {
     const o = await newVerifiedOwner(t.app, t.mailer);
     const a = api(o.cookie);

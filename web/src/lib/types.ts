@@ -53,7 +53,6 @@ export type Delivery = {
   riderScreenshotUrl: string | null;
   pickupAddress: string | null;
   notes: string | null;
-  status: "pending" | "booked" | "picked_up" | "delivered";
   cashHandedOver: boolean;
 };
 

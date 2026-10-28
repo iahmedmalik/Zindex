@@ -16,7 +16,6 @@ const api = (cookie: string) => {
       })).body.order.id as string,
     get: (s: string, o: string) => call("get", `/v1/stores/${s}/orders/${o}/delivery`),
     save: (s: string, o: string, body: object) => call("put", `/v1/stores/${s}/orders/${o}/delivery`, body),
-    status: (s: string, o: string, status: string) => call("post", `/v1/stores/${s}/orders/${o}/delivery/status`, { status }),
   };
 };
 
@@ -43,33 +42,25 @@ describe("local delivery", () => {
     expect((await a.get(store, order)).body.copyText).toContain("Customer pays the rider: PKR 350 (rider fee only; goods already paid)");
   });
 
-  it("records the rider by hand and keeps a status trail that only moves forward", async () => {
+  it("records the rider by hand, and saving it changes only the rider's details", async () => {
     const o = await newVerifiedOwner(t.app, t.mailer);
     const a = api(o.cookie);
     const store = await a.store();
     const order = await a.order(store);
     const saved = await a.save(store, order, { service: "yango", riderName: "Imran", riderPhone: "+92 321 7654321", bikeNumber: "LEA-1234" });
     expect(saved.status).toBe(200);
-    expect(saved.body.delivery).toMatchObject({ service: "yango", riderName: "Imran", riderPhone: "03217654321", bikeNumber: "LEA-1234", status: "pending" });
+    expect(saved.body.delivery).toMatchObject({ service: "yango", riderName: "Imran", riderPhone: "03217654321", bikeNumber: "LEA-1234" });
 
     // A second save changes only the fields sent.
     const later = await a.save(store, order, { notes: "Gate is blue" });
     expect(later.body.delivery).toMatchObject({ riderName: "Imran", notes: "Gate is blue" });
-
-    expect((await a.status(store, order, "booked")).body.delivery.status).toBe("booked");
-    expect((await a.status(store, order, "booked")).status).toBe(409);
-    expect((await a.status(store, order, "pending")).status).toBe(409);
-    await a.status(store, order, "picked_up");
-    const done = await a.status(store, order, "delivered");
-    expect(done.body.events.map((e: { status: string }) => e.status)).toEqual(["booked", "picked_up", "delivered"]);
   });
 
-  it("refuses pickup and courier orders, cancelled orders and a status before the rider is saved", async () => {
+  it("refuses pickup and courier orders, and bad rider fields", async () => {
     const o = await newVerifiedOwner(t.app, t.mailer);
     const a = api(o.cookie);
     const store = await a.store();
     expect((await a.save(store, await a.order(store, { deliveryKind: "courier" }), { riderName: "X" })).status).toBe(409);
-    expect((await a.status(store, await a.order(store), "booked")).status).toBe(404);
     expect((await a.save(store, await a.order(store), { riderPhotoUrl: "http://insecure.example/x.jpg" })).status).toBe(400);
     expect((await a.save(store, await a.order(store), { ownerId: "x" })).status).toBe(400);
   });

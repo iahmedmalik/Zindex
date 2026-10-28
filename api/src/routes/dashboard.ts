@@ -7,7 +7,7 @@ import { rows } from "../db/query";
 // "Needs action" is what the owner has to do something about today:
 //   pending          -> confirm it
 //   toPack           -> confirmed, not packed yet
-//   awaitingRider    -> packed local delivery with no rider booked yet
+//   awaitingRider    -> packed local delivery with no rider added yet
 //   cashOutstanding  -> COD cash a rider has not handed over
 type Counts = {
   storeId: string;
@@ -35,7 +35,7 @@ export function dashboardRouter(db: Db): Router {
         sql`select s.id as store_id, s.name, s.accent,
               count(o.id) filter (where o.status = 'pending')::int as pending,
               count(o.id) filter (where o.status = 'confirmed')::int as to_pack,
-              count(o.id) filter (where o.status = 'packed' and o.delivery_kind = 'local' and coalesce(d.status, 'pending') = 'pending')::int as awaiting_rider,
+              count(o.id) filter (where o.status = 'packed' and o.delivery_kind = 'local' and d.rider_name is null)::int as awaiting_rider,
               count(o.id) filter (where o.status = 'out_for_delivery')::int as out_for_delivery,
               count(o.id) filter (where o.status = 'delivered')::int as delivered,
               count(o.id) filter (where o.status = 'returned')::int as problems,

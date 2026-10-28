@@ -37,8 +37,6 @@ export async function seedDemo(call: Call): Promise<void> {
   const o2 = await order(food, { customerName: "Bilal Ahmed", customerPhone: "0321 7654321", address: "Flat 12, Johar Town, Lahore", payment: "paid", paymentMethod: "Easypaisa", riderFee: 300, items: [{ productId: haldi, quantity: 4 }] });
   await status(food, o2, "confirmed", "packed", "out_for_delivery");
   await call("PUT", `/stores/${food}/orders/${o2}/delivery`, { service: "yango", riderName: "Imran", riderPhone: "0345 5551212", bikeNumber: "LEA-1234" });
-  await call("POST", `/stores/${food}/orders/${o2}/delivery/status`, { status: "booked" });
-  await call("POST", `/stores/${food}/orders/${o2}/delivery/status`, { status: "picked_up" });
   await call("POST", `/stores/${food}/orders/${o2}/payment/confirm`);
   await call("POST", `/stores/${food}/orders/${o2}/card`, { days: 7 });
 

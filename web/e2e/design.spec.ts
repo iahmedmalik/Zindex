@@ -81,6 +81,34 @@ test.describe("receipt and delivery card", () => {
     await other.close();
   });
 
+  test("@smoke the customer's card follows the main button alone, with no rider saved, and there is no second status button", async ({ page, browser }) => {
+    await createOrder(page, { name: "Card Follower", rider: "300" });
+    await page.getByRole("button", { name: "Make delivery card link" }).click();
+    const path = new URL(`http://${await page.locator("code").first().innerText()}`).pathname;
+    const customer = await browser.newContext({ viewport: page.viewportSize() ?? undefined });
+    const card = await customer.newPage();
+    await card.goto(path);
+    await expect(card.getByRole("heading", { level: 1 })).toHaveText("We got your order");
+
+    for (const [button, headline] of [["Confirm order", "Your order is confirmed"], ["Mark packed", "Your order is packed"], ["Out for delivery", "On its way to you"], ["Mark delivered", "Delivered. Enjoy!"]] as const) {
+      await page.getByRole("button", { name: button, exact: true }).click();
+      await expect(page.getByText(/#\d+ is /)).toBeVisible();
+      await card.reload();
+      await expect(card.getByRole("heading", { level: 1 })).toHaveText(headline);
+    }
+    await customer.close();
+  });
+
+  test("saving a rider does not add a second status: only the main button moves the order", async ({ page }) => {
+    await createOrder(page, { name: "One Button", rider: "300" });
+    await page.getByLabel("Rider name").fill("Imran");
+    await page.getByRole("button", { name: "Save rider" }).click();
+    await expect(page.getByText("Imran · Yango")).toBeVisible();
+    await expect(page.getByRole("button", { name: /Mark (booked|picked up)/ })).toHaveCount(0);
+    await expect(page.getByText(/^Ride:/)).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Confirm order", exact: true })).toBeVisible();
+  });
+
   test("a tracking link that is not https is refused with a clear message", async ({ page }) => {
     await createOrder(page, { name: "Bad Link Buyer", rider: "300" });
     await page.getByLabel("Rider name").fill("Imran");

@@ -12,13 +12,15 @@ const fmt = (n: number) => n.toLocaleString("en-US");
 type Card = {
   store: { name: string; phone: string | null; email: string | null; address: string | null; logoUrl: string | null; accent: string };
   order: { orderNo: number; status: string; customerName: string; address: string | null; payment: string; items: { name: string; quantity: number }[]; subtotal: number; discount: number; deliveryCharge: number; total: number; riderFee: number; codAmount: number; collectAtDoor: number };
-  delivery: { status: string; service: string | null; riderName: string | null; riderPhone: string | null; bikeNumber: string | null; riderPhotoUrl: string | null; hasPhoto: boolean; riderPhotoTakenAt: string | null; trackingUrl: string | null; riderScreenshotUrl: string | null; events: { status: string; at: string }[] } | null;
+  delivery: { service: string | null; riderName: string | null; riderPhone: string | null; bikeNumber: string | null; riderPhotoUrl: string | null; hasPhoto: boolean; riderPhotoTakenAt: string | null; trackingUrl: string | null; riderScreenshotUrl: string | null } | null;
   expiresAt: string;
 };
 
-const steps = ["pending", "booked", "picked_up", "delivered"];
-const label: Record<string, string> = { pending: "Packed", booked: "Rider booked", picked_up: "On the way", delivered: "Delivered" };
-const headline: Record<string, string> = { pending: "Your order is being prepared", booked: "A rider is coming for your order", picked_up: "On its way", delivered: "Delivered. Enjoy!" };
+// The card follows the ORDER's status, the one the shop moves with its main button; a rider is optional extra detail.
+const steps = ["pending", "confirmed", "packed", "out_for_delivery", "delivered"];
+const label: Record<string, string> = { pending: "Ordered", confirmed: "Confirmed", packed: "Packed", out_for_delivery: "On the way", delivered: "Delivered" };
+const headline: Record<string, string> = { pending: "We got your order", confirmed: "Your order is confirmed", packed: "Your order is packed", out_for_delivery: "On its way to you", delivered: "Delivered. Enjoy!" };
+const closedHeadline: Record<string, string> = { cancelled: "This order was cancelled", returned: "This order came back to the shop" };
 const Check = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5" /></svg>;
 const Phone = () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 4h3.5l1.5 4-2 1.5a11 11 0 0 0 6.5 6.5l1.5-2 4 1.5V19a1 1 0 0 1-1 1A16 16 0 0 1 4 5a1 1 0 0 1 1-1z" /></svg>;
 const Chat = () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 19.5 5.2 16A8 8 0 1 1 8 18.8z" /><path d="M9 10.5h6M9 13.5h4" /></svg>;
@@ -47,11 +49,11 @@ export default async function CardPage({ params }: { params: Promise<{ token: st
   }
 
   const { store, order, delivery } = card;
-  const at = delivery ? steps.indexOf(delivery.status) : 0;
+  const at = Math.max(0, steps.indexOf(order.status));
   const first = order.customerName.split(" ")[0];
   const until = new Date(card.expiresAt).toLocaleDateString("en-GB", { day: "numeric", month: "long" });
   const wa = store.phone ? `https://wa.me/${store.phone.replace(/\D/g, "").replace(/^0/, "92")}` : null;
-  const cancelled = order.status === "cancelled";
+  const cancelled = order.status === "cancelled" || order.status === "returned";
   const track = safeLink(delivery?.trackingUrl ?? null);
   const hasRider = !!delivery && (delivery.riderName || delivery.riderPhone);
   const photoSrc = delivery?.hasPhoto ? `/backend/v1/public/card/${encodeURIComponent(token)}/photo` : safeLink(delivery?.riderPhotoUrl ?? null);
@@ -66,14 +68,14 @@ export default async function CardPage({ params }: { params: Promise<{ token: st
         </header>
 
         <section className="arrive" style={{ ["--i" as string]: 1 }}>
-          <h1 className="big">{cancelled ? "This order was cancelled" : headline[delivery?.status ?? "pending"]}</h1>
-          {delivery?.status === "picked_up" && delivery.riderName && <p className="note-on">{delivery.riderName} has your parcel.</p>}
+          <h1 className="big">{cancelled ? closedHeadline[order.status] : headline[order.status]}</h1>
+          {order.status === "out_for_delivery" && delivery?.riderName && <p className="note-on">{delivery.riderName} has your parcel.</p>}
         </section>
 
-        {!cancelled && delivery?.status !== "delivered" && <div className="arrive" style={{ ["--i" as string]: 2 }}><RouteMap /></div>}
+        {order.status === "out_for_delivery" && <div className="arrive" style={{ ["--i" as string]: 2 }}><RouteMap /></div>}
 
         {!cancelled && (
-          <ol className="journey card-journey arrive" style={{ ["--n" as string]: 4, ["--at" as string]: Math.max(0, at), ["--i" as string]: 2 }} aria-label="Delivery progress">
+          <ol className="journey card-journey arrive" style={{ ["--n" as string]: 5, ["--at" as string]: Math.max(0, at), ["--i" as string]: 2 }} aria-label="Delivery progress">
             {steps.map((s, i) => (
               <li key={s} className={i < at ? "done" : i === at ? "now" : ""} aria-current={i === at ? "step" : undefined}>
                 <span className="node">{i < at || (i === at && s === "delivered") ? <Check /> : i + 1}</span><span>{label[s]}</span>
@@ -104,7 +106,7 @@ export default async function CardPage({ params }: { params: Promise<{ token: st
           </figure>
         )}
 
-        {track && !cancelled && delivery?.status !== "delivered" && (
+        {track && !cancelled && order.status !== "delivered" && (
           <div className="arrive" style={{ ["--i" as string]: 5, display: "grid", gap: 6 }}>
             <a className="btn white-btn" href={track} target="_blank" rel="noopener noreferrer"><Pin />Track delivery</a>
             <p className="note-on" style={{ textAlign: "center" }}>Opens your rider&apos;s live trip</p>
