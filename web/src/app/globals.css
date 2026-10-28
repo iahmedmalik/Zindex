@@ -4,6 +4,8 @@
 :root {
   /* paper and ink (light) */
   --paper: #f1efed;            /* the screen: warm grey, white cards sit on it */
+  --g0: #f7e6e4; --g1: #f1efed; --g2: #ece7e3;   /* the page gradient: a faint store-red at the top, warm grey below */
+  --route: #5d1b23;            /* the dashed delivery curve behind the screens */
   --paper-2: #e9e4e1;          /* second neutral layer: wells, chips */
   --surface: #ffffff;          /* cards */
   --ink: #16100f;
@@ -42,6 +44,7 @@
 
 :root[data-theme="dark"] {
   --paper: #161011; --paper-2: #2c2123; --surface: #221819; --ink: #f5eeee; --ink-2: #a79a9b;
+  --g0: #2b1519; --g1: #161011; --g2: #0f0a0b; --route: #d98a94;
   --line: #33282a; --brand: #d98a94; --brand-ink: #1c1315; --brand-soft: #3a2327;
   --ok: #7cc28d; --warn: #e2a64d; --bad: #f08a8e; --focus: #7fb0ff;
   --shadow-sheet: 0 -8px 32px -8px rgb(0 0 0 / 0.6), 0 -1px 0 rgb(255 255 255 / 0.05);
@@ -50,6 +53,7 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme]) {
     --paper: #161011; --paper-2: #2c2123; --surface: #221819; --ink: #f5eeee; --ink-2: #a79a9b;
+  --g0: #2b1519; --g1: #161011; --g2: #0f0a0b; --route: #d98a94;
     --line: #33282a; --brand: #d98a94; --brand-ink: #1c1315; --brand-soft: #3a2327;
     --ok: #7cc28d; --warn: #e2a64d; --bad: #f08a8e; --focus: #7fb0ff;
   }
@@ -85,8 +89,8 @@ input, select, textarea, button { font: inherit; color: inherit; }
 .arrive { animation: arrive var(--t-enter) var(--ease) both; animation-delay: calc(min(var(--i, 0), 6) * var(--stagger)); }
 
 /* ---------- shell: phone first ---------- */
-.app { min-height: 100dvh; display: grid; grid-template-rows: auto 1fr; padding-bottom: calc(76px + env(safe-area-inset-bottom)); }
-.bar { position: sticky; top: 0; z-index: 20; display: flex; align-items: center; gap: 12px; padding: 10px 16px; background: color-mix(in srgb, var(--paper) 90%, transparent); backdrop-filter: blur(10px); }
+.app { position: relative; background: linear-gradient(180deg, var(--g0) 0%, var(--g1) 38%, var(--g2) 100%); min-height: 100dvh; display: grid; grid-template-rows: auto 1fr; padding-bottom: calc(76px + env(safe-area-inset-bottom)); }
+.bar { position: sticky; top: 0; z-index: 20; display: flex; align-items: center; gap: 12px; padding: 10px 16px; background: color-mix(in srgb, var(--g0) 86%, transparent); backdrop-filter: blur(10px); }
 .bar .note { display: none; }
 .mark { font-weight: 700; letter-spacing: -0.02em; font-size: var(--t-lg); color: var(--brand); display: inline-flex; align-items: center; gap: 8px; text-decoration: none; }
 .mark svg { width: 22px; height: 22px; }
@@ -310,3 +314,8 @@ main li > a:not(.row):not(.tile):not(.btn), main > a.note, .page > a.note { disp
 
 /* A page with its own action bar (an order, the new-order form) hides the floating New order button, so it never covers the main action. */
 @media (max-width: 899px) { .app:has(.dock) .tabs .new { display: none; } }
+
+/* The route backdrop sits behind everything on the app screens; content stays above it. */
+.backdrop { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; color: var(--route); opacity: 0.2; }
+.app > header, .app > main { position: relative; z-index: 1; }
+@media print { .backdrop { display: none; } }

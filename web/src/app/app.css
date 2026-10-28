@@ -182,24 +182,22 @@
 .dcard .stack { gap: 10px; }
 
 /* The Receipt: a till slip with a torn bottom edge. Used for the order, the invoice preview and the delivery card. */
-.slip { background: #fffdf8; color: #2a1c1d; border-radius: 14px 14px 0 0; padding: 18px 16px 26px; font-family: var(--font-mono), ui-monospace, monospace; font-size: var(--t-sm); position: relative; display: grid; gap: 2px; -webkit-mask: conic-gradient(from -45deg at bottom, #0000, #000 1deg 89deg, #0000 90deg) 50% / 14px 100%; mask: conic-gradient(from -45deg at bottom, #0000, #000 1deg 89deg, #0000 90deg) 50% / 14px 100%; animation: print var(--t-enter) var(--ease) both; transform-origin: top; }
+.slip { background: #fffdf8; color: #2a1c1d; border-radius: 14px 14px 0 0; padding: 18px 16px 26px; font-family: var(--font); font-size: var(--t-sm); position: relative; display: grid; gap: 2px; -webkit-mask: conic-gradient(from -45deg at bottom, #0000, #000 1deg 89deg, #0000 90deg) 50% / 14px 100%; mask: conic-gradient(from -45deg at bottom, #0000, #000 1deg 89deg, #0000 90deg) 50% / 14px 100%; animation: print var(--t-enter) var(--ease) both; transform-origin: top; }
 .slip h2, .slip h4 { font-family: var(--font-display); letter-spacing: 0.03em; color: #2a1c1d; font-size: var(--t-md); font-weight: 700; }
 .slip .due { font-family: var(--font-display); font-size: 2.4rem; font-weight: 600; letter-spacing: -0.03em; line-height: 1.1; }
 .slip .mut { opacity: 0.78; font-size: var(--t-xs); }
+.slip .num, .slip .tot { font-family: var(--font-display); font-variant-numeric: tabular-nums; }
 .slip .ln { display: flex; justify-content: space-between; gap: 12px; padding: 2.5px 0; }
 .slip .ln.tot { border-top: 1.5px dashed rgb(42 28 29 / 0.4); margin-top: 8px; padding-top: 8px; font-weight: 700; }
 .slip .contact { justify-content: center; text-align: center; margin-top: 10px; }
 @keyframes print { from { opacity: 0; transform: translateY(-24px) scaleY(0.3); } }
 @keyframes dip { 40% { transform: translateY(3px); } }
 .slip.dip { animation: dip 0.22s var(--ease); }
-.stampmark { position: absolute; right: 12px; top: 40px; border: 3px solid var(--brand); color: #5d1b23; border-radius: 8px; padding: 3px 10px; font-family: var(--font-display); font-weight: 700; font-size: var(--t-sm); letter-spacing: 0.08em; transform: rotate(-9deg); opacity: 0; mix-blend-mode: multiply; pointer-events: none; }
-.stampmark.hit { animation: stampin 0.55s var(--ease) forwards; }
-@keyframes stampin { 0% { transform: rotate(-9deg) scale(2.2); opacity: 0; } 55% { transform: rotate(-9deg) scale(0.92); opacity: 0.95; } 100% { transform: rotate(-9deg) scale(1); opacity: 0.9; } }
+.slipchip { position: absolute; right: 14px; top: 16px; display: inline-flex; align-items: center; gap: 7px; padding: 4px 12px 4px 9px; border-radius: 999px; background: var(--store-soft, #f3e6e3); color: #5d1b23; font: 600 var(--t-xs)/1.2 var(--font-display); animation: arrive var(--t-enter) var(--ease) both; }
+.slipchip i { width: 8px; height: 8px; border-radius: 50%; background: var(--brand); }
 :root[data-motion="reduced"] :is(.slip, .slip.dip) { animation: arrive var(--t-enter) var(--ease) both; }
-:root[data-motion="reduced"] .stampmark.hit { animation: none; opacity: 0.9; transform: rotate(-9deg); }
 @media (prefers-reduced-motion: reduce) {
   :root:not([data-motion="full"]) :is(.slip, .slip.dip) { animation: arrive var(--t-enter) var(--ease) both; }
-  :root:not([data-motion="full"]) .stampmark.hit { animation: none; opacity: 0.9; transform: rotate(-9deg); }
 }
 
 /* the rider photo row on an order */

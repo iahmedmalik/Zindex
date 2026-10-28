@@ -4,8 +4,8 @@ import type { Order, Store } from "@/lib/types";
 const n = (x: number) => x.toLocaleString("en-US");
 
 /**
- * The Receipt: an order as a till slip. The stage is pressed onto it as a stamp; changing the stage
- * remounts the stamp (the key), which plays the press again. It carries the store's own email, phone and
+ * The Receipt: an order as a till slip. The stage is shown as a status chip; changing the stage
+ * remounts the chip (the key), which plays the arrival again. It carries the store's own email, phone and
  * address (set in the store's details), so what the owner sees is what a customer gets.
  */
 export function Receipt({ order, store }: { order: Order; store?: Store }) {
@@ -23,7 +23,7 @@ export function Receipt({ order, store }: { order: Order; store?: Store }) {
       {order.riderFee > 0 && <div className="ln"><span>Rider fee (to the rider)</span><span className="num">+ {n(order.riderFee)}</span></div>}
       {order.collectAtDoor > 0 && <div className="ln tot" style={{ borderTopStyle: "solid" }}><span>AT THE DOOR</span><span className="num">{pkr(order.collectAtDoor)}</span></div>}
       {store?.address && <div className="ln mut contact"><span>{store.address}</span></div>}
-      <div key={order.status} className="stampmark hit" aria-hidden="true">{stageLabel[order.status].toUpperCase()}</div>
+      <span key={order.status} className="slipchip"><i />{stageLabel[order.status]}</span>
     </div>
   );
 }

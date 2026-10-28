@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { Logo } from "@/components/graphics";
+import { Logo, RouteBackdrop } from "@/components/graphics";
 import { Icon, ToastProvider } from "@/components/ui";
 import { apply, load } from "@/lib/appearance";
 import { SessionProvider, useSession } from "@/lib/session";
@@ -59,6 +59,7 @@ function Chrome({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="app">
+      <RouteBackdrop />
       <header className="bar">
         <Link className="mark" href="/"><Logo size={26} />Zindex</Link>
         <span className="spacer" />

@@ -56,3 +56,13 @@ export function Logo({ size = 40, draw = false, tone = "brand" }: { size?: numbe
     </svg>
   );
 }
+
+/** A faint dashed delivery curve with a start dot behind the app screens ("The trip"); decoration only. */
+export function RouteBackdrop() {
+  return (
+    <svg className="backdrop" viewBox="0 0 300 140" preserveAspectRatio="xMidYMid slice" fill="none" aria-hidden="true">
+      <path d="M20 120C90 140 100 50 170 70S250 20 285 28" stroke="currentColor" strokeWidth="2.4" strokeDasharray="3 9" strokeLinecap="round" />
+      <circle cx="20" cy="120" r="6" fill="currentColor" />
+    </svg>
+  );
+}
