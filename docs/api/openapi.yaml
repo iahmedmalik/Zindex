@@ -92,6 +92,8 @@ paths:
   /v1/stores/{storeId}/stock/{productId}/history:
     parameters: [{ $ref: "#/components/parameters/storeId" }, { name: productId, in: path, required: true, schema: { type: string, format: uuid } }]
     get: { tags: [Catalogue], summary: The product's stock changes, newest first, responses: { "200": { description: OK } } }
+  /v1/reports/received:
+    get: { tags: [Reports], summary: "Money received in a period, by the day each payment came in (from the payment ledger)", responses: { "200": { description: OK } } }
   /v1/stores/{storeId}/missing-costs:
     parameters: [{ $ref: "#/components/parameters/storeId" }]
     get: { tags: [Reports], summary: "Costs to fill in: the sold lines that have no cost, grouped by product or typed name, with their sales ({ groups })", responses: { "200": { description: OK } } }
@@ -113,7 +115,7 @@ paths:
       tags: [Orders]
       summary: List and search orders
       parameters:
-        - { name: q, in: query, schema: { type: string }, description: Customer name, phone, or #number }
+        - { name: q, in: query, schema: { type: string }, description: "Customer name, phone, or #number" }
         - { name: status, in: query, schema: { $ref: "#/components/schemas/Stage" } }
         - { name: payment, in: query, schema: { enum: [paid, cod, unpaid] } }
         - { name: method, in: query, schema: { type: string } }
@@ -125,7 +127,8 @@ paths:
       responses: { "200": { description: The same order again (retry) }, "201": { description: Created }, "400": { description: Invalid amounts or items } }
   /v1/stores/{storeId}/orders/{orderId}:
     parameters: [{ $ref: "#/components/parameters/storeId" }, { $ref: "#/components/parameters/orderId" }]
-    get: { tags: [Orders], summary: One order with its items, responses: { "200": { description: OK }, "404": { $ref: "#/components/responses/NotFound" } } }
+    get: { tags: [Orders], summary: "One order with its items, its expected and paid amounts, and deletable (ok and reason)", responses: { "200": { description: OK }, "404": { $ref: "#/components/responses/NotFound" } } }
+    delete: { tags: [Orders], summary: "Delete an order: only a pending one, or a cancelled one whose stock is back, with no payments, and only if its invoice is the store's latest number (the number is given back so none is skipped)", responses: { "200": { description: Deleted }, "409": { description: Not allowed, with the reason } } }
     patch: { tags: [Orders], summary: Edit and recalculate; items are locked once confirmed; edits after the invoice is final are logged, responses: { "200": { description: OK }, "409": { description: Locked } } }
   /v1/stores/{storeId}/orders/{orderId}/status:
     parameters: [{ $ref: "#/components/parameters/storeId" }, { $ref: "#/components/parameters/orderId" }]
@@ -168,16 +171,23 @@ paths:
       responses: { "200": { description: The card }, "404": { description: Wrong, expired or switched off }, "429": { description: Too many requests } }
   /v1/stores/{storeId}/orders/{orderId}/payment/confirm:
     parameters: [{ $ref: "#/components/parameters/storeId" }, { $ref: "#/components/parameters/orderId" }]
-    post: { tags: [Money], summary: "I can see the advance payment (payment is never marked received by itself)", responses: { "200": { description: OK } } }
+    post: { tags: [Money], summary: "I can see the advance payment: records what is left as one payment (never marked received by itself)", responses: { "200": { description: OK } } }
   /v1/stores/{storeId}/orders/{orderId}/payment/cash-handover:
     parameters: [{ $ref: "#/components/parameters/storeId" }, { $ref: "#/components/parameters/orderId" }]
-    post: { tags: [Money], summary: The rider handed over the COD cash (settles the order), responses: { "200": { description: OK } } }
+    post: { tags: [Money], summary: "The rider or courier handed over the COD cash: records what is left as one payment", responses: { "200": { description: OK } } }
   /v1/stores/{storeId}/orders/{orderId}/payment:
     parameters: [{ $ref: "#/components/parameters/storeId" }, { $ref: "#/components/parameters/orderId" }]
-    delete: { tags: [Money], summary: Correct a mistake: not received after all, responses: { "200": { description: OK } } }
+    delete: { tags: [Money], summary: "Correct a mistake: none of it was received after all (removes every payment)", responses: { "200": { description: OK } } }
+  /v1/stores/{storeId}/orders/{orderId}/payments:
+    parameters: [{ $ref: "#/components/parameters/storeId" }, { $ref: "#/components/parameters/orderId" }]
+    get: { tags: [Money], summary: "The payment ledger: expected, paid, balance and each payment. Expected is the COD amount for a COD order and the total for any other.", responses: { "200": { description: OK } } }
+    post: { tags: [Money], summary: "Add a payment of any amount up to the balance ({ amount, method, note, receivedOn }). A customer who pays later can pay in chunks; COD can be recorded once the order is out for delivery.", responses: { "201": { description: OK }, "400": { description: Bad amount or a future date }, "409": { description: More than the balance, or not allowed for this order } } }
+  /v1/stores/{storeId}/orders/{orderId}/payments/{paymentId}:
+    parameters: [{ $ref: "#/components/parameters/storeId" }, { $ref: "#/components/parameters/orderId" }, { name: paymentId, in: path, required: true, schema: { type: string, format: uuid } }]
+    delete: { tags: [Money], summary: Undo one payment, responses: { "200": { description: OK }, "404": { description: Not found } } }
   /v1/stores/{storeId}/cod-summary:
     parameters: [{ $ref: "#/components/parameters/storeId" }]
-    get: { tags: [Money], summary: Cash expected, handed over and still with riders, responses: { "200": { description: OK } } }
+    get: { tags: [Money], summary: "Cash to collect in three buckets (with riders, from customers, from couriers) with each order still owing money, what is left and when it was delivered", responses: { "200": { description: OK } } }
   /v1/stores/{storeId}/templates:
     parameters: [{ $ref: "#/components/parameters/storeId" }]
     get: { tags: [Messages], summary: The seven WhatsApp templates (the store's wording or the default), responses: { "200": { description: OK } } }
@@ -201,7 +211,7 @@ paths:
         - { name: format, in: query, schema: { enum: [csv] } }
       responses: { "200": { description: JSON or a CSV file for Excel }, "400": { description: Bad dates } }
   /v1/reports/inventory:
-    get: { tags: [Reports], summary: Stock per product, per store or combined (?format=csv for Excel), responses: { "200": { description: OK } } }
+    get: { tags: [Reports], summary: "Stock per product, per store or combined (?format=csv for Excel)", responses: { "200": { description: OK } } }
   /v1/stores/{storeId}/import/shopify-orders:
     parameters: [{ $ref: "#/components/parameters/storeId" }]
     post:
@@ -211,7 +221,7 @@ paths:
       responses: { "200": { description: "{ imported, alreadyImported, skipped, warnings }" }, "400": { description: Not a Shopify export } }
   /v1/stores/{storeId}/shopify:
     parameters: [{ $ref: "#/components/parameters/storeId" }]
-    get: { tags: [Shopify], summary: Is this store connected to Shopify?, responses: { "200": { description: OK } } }
+    get: { tags: [Shopify], summary: "Is this store connected to Shopify?", responses: { "200": { description: OK } } }
     put: { tags: [Shopify], summary: Name the store's .myshopify.com address, responses: { "200": { description: OK } } }
   /v1/stores/{storeId}/shopify/sync:
     parameters: [{ $ref: "#/components/parameters/storeId" }]

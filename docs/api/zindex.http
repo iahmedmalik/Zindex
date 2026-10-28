@@ -98,7 +98,22 @@ POST {{api}}/v1/stores/{{store}}/orders/{{order}}/payment/confirm
 POST {{api}}/v1/stores/{{store}}/orders/{{order}}/payment/cash-handover
 
 ###
+GET {{api}}/v1/stores/{{store}}/orders/{{order}}/payments
+
+### Add a payment: any amount up to what is left (a pay-later customer can pay in chunks)
+POST {{api}}/v1/stores/{{store}}/orders/{{order}}/payments
+Content-Type: application/json
+
+{ "amount": 500, "method": "Easypaisa", "receivedOn": "2026-10-29" }
+
+###
 GET {{api}}/v1/stores/{{store}}/cod-summary
+
+### Money received in a period, by the day each payment came in
+GET {{api}}/v1/reports/received?from=2026-10-01&to=2026-10-31
+
+### Delete an order: only a pending one, or a cancelled one with its stock back, with no payments, and only if its invoice is the store's latest number
+DELETE {{api}}/v1/stores/{{store}}/orders/{{order}}
 
 ### Courier parcel, recorded by hand
 PUT {{api}}/v1/stores/{{store}}/orders/{{order}}/shipment
