@@ -32,3 +32,10 @@ The API tests use a throw-away PostgreSQL that is started on the developer's own
 - **Every commit:** typecheck, API tests, build (CI on GitHub Actions).
 - **Before a release:** the full browser suite, the load test, and a manual pass on a real phone.
 - **After a deploy:** the `@smoke` set against the live address.
+
+## Added 28 October (invoice, invitations, demo, tour)
+
+- **Invoice picture parity:** the saved image of the paper (A4 and compact) is compared with a screenshot of the paper on screen: same shape, a gradient header, mean difference under 8 of 255.
+- **Owner-only sign-up:** a listed address (any letter case) can sign up, another is refused with a plain message, the demo address is exempt, and with the list unset sign-up stays open (development).
+- **Demo:** starts without a password, preloads three stores and orders, does not seed twice, blocks backups, Shopify and password changes, caps stores and orders, and wipes and re-seeds when a day old.
+- **Tour:** opens on a first sign-in and on every demo start, closes with Skip or Escape and stays closed, replays from More, stays inside the screen on laptop and 375 px.

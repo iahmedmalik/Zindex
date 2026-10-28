@@ -10,7 +10,7 @@ Zindex turns a chat order into an invoice in about a minute, keeps stock honest,
 
 - **One-page order entry.** Find the customer by phone (saved and reused), tap products, set a percent discount, pick rider, courier or pickup, choose cash on delivery, paid in advance or pay later. The total, and what the customer pays at the door, update as you type.
 - **Several stores, one login.** Each store has its own invoice numbers, prices, stock, customers, WhatsApp number and colour. Nothing mixes.
-- **Invoices.** A draft first, then final with the store's next gap-free number (`SF-0007`). Changes after that are logged. A4 or compact receipt, print or PDF, or an image to send on WhatsApp.
+- **Invoices that look like the shop.** A draft first, then final with the store's next gap-free number (`SF-0007`). Changes after that are logged. The paper wears the store's own colour, shows the exact amount to have ready for the rider, and comes as A4 or a compact receipt: **Save to gallery** (the phone's share sheet), send on WhatsApp, or download a PDF.
 - **Stock you can trust.** An append-only ledger. Stock leaves once, when you confirm an order; goes back only when you approve; warns at zero but never blocks a sale.
 - **Riders without the copy-paste.** One tap copies the pickup, address, map links, parcel and amount for inDrive or Yango. The rider's fee is kept apart from the shop's money, so cash adds up.
 - **The delivery card.** A link for the customer: status, rider name, bike number, a call button, and the exact amount to have ready. In the store's own colour. It expires and can be switched off; only a hash of the link is stored.
@@ -19,6 +19,8 @@ Zindex turns a chat order into an invoice in about a minute, keeps stock honest,
 - **Courier parcels** recorded by hand with tracking and failure reasons.
 - **Reports** for any dates, per store or together, with Excel files; stock reports; a full backup download.
 - **Shopify**: import the orders export as pending orders with draft invoices (importing twice adds nothing) and sync products (names, prices, pictures; never stock).
+- **Try the demo.** One tap on the sign-in page opens a preloaded demo shop (three stores, orders in every stage, an invoice, a rider and a delivery card) with a short guided tour. It resets every day and has guard rails (no backups, no Shopify, small caps).
+- **By invitation.** Sign-up is limited to the shop owners' email addresses; sign-in is protected by email confirmation and rate limits.
 - **Light, dark, and a calmer motion setting;** installable on a phone.
 
 ## How it is built
@@ -65,7 +67,7 @@ Numbers and results are in [docs/TEST-REPORT.md](docs/TEST-REPORT.md); the plan 
 
 ## Deploying
 
-The API deploys from [render.yaml](render.yaml) (secrets are entered in Render's dashboard, never in the repo); the web app on Vercel with `API_URL` pointing at the API; the database on Neon, with the migrations applied by `npm run db:migrate -w @zindex/api`. The free API sleeps when idle, so the app shows a "waking up" screen when the server is asleep, and a free pinger is planned to keep it awake during shop hours.
+The API deploys from [render.yaml](render.yaml) (secrets such as the database address, the email key and the owner emails are entered in Render's dashboard, never in the repo); the web app on Vercel with `API_URL` pointing at the API; the database on Neon, with the migrations applied by `npm run db:migrate -w @zindex/api`. The free API sleeps when idle, so the app shows a "waking up" screen when the server is asleep, and a free pinger is planned to keep it awake during shop hours.
 
 ## Licence
 

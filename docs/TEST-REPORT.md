@@ -1,15 +1,16 @@
 # Zindex: test report
 
-**Run:** 28 October 2026, on the developer's Windows 10 computer, Node 22, a local PostgreSQL, desktop Edge (Chromium).
+**Run:** 28 October 2026 (after the invoice, owner-only sign-up, demo and tour were added), on the developer's Windows 10 computer, Node 22, a local PostgreSQL, desktop Edge (Chromium).
 
 ## Results
 
 | Suite | Result |
 |---|---|
-| API tests (Vitest, real local PostgreSQL) | **115 passed**, 0 failed, 21 test files |
-| Browser tests (Playwright, against the production build) | **34 passed**, 0 failed: 17 tests, each run at desktop 1280 px and a 375 px phone view |
+| API tests (Vitest, real local PostgreSQL) | **125 passed**, 0 failed, 22 test files |
+| Browser tests (Playwright, against the production build) | **42 passed**, 0 failed: 21 tests, each run at desktop 1280 px and a 375 px phone view (includes the saved-invoice-picture comparison, the tour and the demo) |
 | Typecheck | web clean; API has one known error in `scripts/load-test.ts` (the load-test script, not the server or the tests) |
-| Production build (Next.js) | passes, 18 routes |
+| Production build (Next.js) | passes |
+| Dependency audit (`npm audit`) | 0 vulnerabilities |
 | CI (GitHub Actions: typecheck, tests, build) | green on every API commit |
 
 ## Defects found by testing, and fixed
@@ -25,6 +26,11 @@
 | Browser test | Closed (folded) panels still had buttons that could be tabbed to and were read by screen readers | Closed panels are hidden from the keyboard and screen readers, and still fold away smoothly |
 | Browser test on a phone (found while testing the redesign) | The floating "New order" button sat on top of the order page's action bar at the bottom of the page and could cover "Confirm order" | Pages with their own action bar hide the floating button |
 | Accessibility check (axe) | Today had no main heading for screen readers; the logo link, "See all" and the store-colour swatches were smaller than 44 px | Hidden Today heading added; those targets are now 44 px |
+| Looking at the new invoice on screen | The invoice body was blank: its class names (`.sheet`, `.hero`, `.paper`...) collided with older classes in the same stylesheet (a bottom sheet that is hidden off screen, 16 px of extra padding) | The invoice classes now carry their own prefix (`iv-`, `ivp`) |
+| API test for owner-only sign-up | Refusing a stranger inside the database hook was hidden by the sign-in library behind a fake success, so the person saw no message | The sign-up request itself is checked first and answers 403 with a plain message; the database hook stays as a second lock |
+| Looking at the guided tour | The tour skipped the floating "New order" button (a fixed element has no layout parent, so the "is it on the page" check said no) | The check uses the element's drawn size instead |
+| Browser test of the tour | Pressing Escape before the tour card had finished fading in did nothing (the key was only heard once focus was inside the card), so the tour stayed open and blocked the page | Escape is now heard from anywhere while the tour is open; the Tab and Shift+Tab loop goes round all its buttons |
+| Browser test, first run | The saved-picture test compared the picture with a screenshot that had the sticky top bar and a toast on top of the paper (a defect in the test) | The test hides those bars and takes its screenshot before saving; the difference is now under 8 of 255 |
 | API test while building reports | A cancelled order was counted in "orders today" in my own expectation; the code was right | Test expectation corrected |
 
 ## Load test (API only)
@@ -44,7 +50,9 @@ The delivery card stops at 120 requests a minute per address on purpose (the rat
 ## Not yet tested
 
 - **Real Shopify**: the order import was tested against a file in Shopify's standard export layout that I wrote, and the product sync against a stand-in Shopify. Both need one check against the owner's real export and real app keys.
-- **Real email** (sign-up confirmation, password reset): tested with an in-memory mailer; the live sender is set up at deploy.
+- **Real email** (sign-up confirmation, password reset): tested with an in-memory mailer; the live sender is set up at deploy. The sender is a personal mailbox without its own DKIM/DMARC records, so a confirmation email may land in spam; the first sign-ins are checked by hand.
+- **The demo in production**: tested locally (preloaded data, guard rails, daily reset); it is switched on and checked live at deploy.
+- **Saving to the phone gallery**: a web page cannot write to the gallery silently; the "Save to gallery" button opens the phone's share sheet. Tested as a downloaded picture; the share sheet itself needs the owner's real phone.
 - **Real phone**: the layout was tested at 375 px in a browser; the owner's own phone check is part of the release.
 - **Entry speed**: "a WhatsApp order in about a minute" has not been timed with the owner yet.
 - **Accessibility**: contrast was measured on every screen in light and dark; a screen-reader pass and a keyboard-only pass have not been done.
