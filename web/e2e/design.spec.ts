@@ -90,9 +90,9 @@ test.describe("receipt and delivery card", () => {
     await card.goto(path);
     await expect(card.getByRole("heading", { level: 1 })).toHaveText("We got your order");
 
-    for (const [button, headline] of [["Confirm order", "Your order is confirmed"], ["Mark packed", "Your order is packed"], ["Out for delivery", "On its way to you"], ["Mark delivered", "Delivered. Enjoy!"]] as const) {
+    for (const [button, said, headline] of [["Confirm order", "confirmed", "Your order is confirmed"], ["Mark packed", "packed", "Your order is packed"], ["Out for delivery", "out for delivery", "On its way to you"], ["Mark delivered", "delivered", "Delivered. Enjoy!"]] as const) {
       await page.getByRole("button", { name: button, exact: true }).click();
-      await expect(page.getByText(/#\d+ is /)).toBeVisible();
+      await expect(page.getByText(new RegExp(String.raw`#\d+ is ` + said))).toBeVisible(); // this step's own message, not the last one's
       await card.reload();
       await expect(card.getByRole("heading", { level: 1 })).toHaveText(headline);
     }
