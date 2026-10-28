@@ -1,6 +1,10 @@
 import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { ORIGIN, PASSWORD, buildTestApp, cookieOf, linkFor, newId, post } from "./helpers";
+import { createApp } from "../src/app";
+import { createAuth } from "../src/auth";
+import { createDb } from "../src/db/client";
+import { memoryMailer } from "../src/mailer";
+import { ORIGIN, PASSWORD, buildTestApp, cookieOf, linkFor, newId, post, testConfig, urls } from "./helpers";
 
 // Sign-up, email verification and sign-in against a real local Postgres, through the real Express app.
 
@@ -87,5 +91,31 @@ describe("sign-in rate limit", () => {
     }
     expect(statuses).toContain(429);
     await limited.close();
+  });
+});
+
+describe("sign-up by invitation", () => {
+  const restricted = (() => {
+    const { db, pool } = createDb(urls.app());
+    const mailer = memoryMailer();
+    const config = { ...testConfig, OWNER_EMAILS: "Boss@Example.com, second@example.com", DEMO_EMAIL: "demo@example.com" };
+    return { app: createApp({ config, db, auth: createAuth(db, config, mailer) }), close: () => pool.end() };
+  })();
+  afterAll(() => restricted.close());
+
+  it("lets a listed address sign up, whatever its letter case", async () => {
+    const res = await post(restricted.app, "/v1/auth/sign-up/email", { name: "Boss", email: "boss@example.com", password: PASSWORD });
+    expect(res.status).toBe(200);
+  });
+
+  it("refuses an address that is not listed, with a plain message", async () => {
+    const res = await post(restricted.app, "/v1/auth/sign-up/email", { name: "Stranger", email: "stranger@example.com", password: PASSWORD });
+    expect(res.status).toBe(403);
+    expect(res.body.message).toMatch(/invitation/i);
+  });
+
+  it("always lets the demo address exist", async () => {
+    const res = await post(restricted.app, "/v1/auth/sign-up/email", { name: "Demo", email: "demo@example.com", password: PASSWORD });
+    expect(res.status).toBe(200);
   });
 });

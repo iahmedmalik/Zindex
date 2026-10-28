@@ -73,3 +73,4 @@ export default function SignInPage() {
     </main>
   );
 }
+            <div className={`expand${mode === "up" ? " open" : ""}`}><div><p className="note">Zindex is by invitation. Use the email address the owner gave access to.</p></div></div>

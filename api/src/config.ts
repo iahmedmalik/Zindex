@@ -9,6 +9,12 @@ const schema = z.object({
   // Email is sent through Brevo when a key is set; without one the link is printed in the log (development).
   BREVO_API_KEY: z.string().min(1).optional(),
   MAIL_FROM: z.string().min(3).default("Zindex <no-reply@example.com>"),
+  // Who may sign up: comma-separated addresses. Unset = anyone (local development). Set in production.
+  OWNER_EMAILS: z.string().optional(),
+  // The public demo account is always allowed to exist, even when sign-up is limited to the owners.
+  DEMO_EMAIL: z.string().optional(),
+  // With both set, "Try the demo" signs visitors in to the demo account (routes/demo.ts). The password is public on purpose.
+  DEMO_PASSWORD: z.string().min(10).optional(),
   // Shopify product sync: {"shop.myshopify.com": {"clientId": "...", "clientSecret": "..."}}. Render only.
   SHOPIFY_APPS: z.string().optional(),
   PORT: z.coerce.number().int().positive().default(4000),
