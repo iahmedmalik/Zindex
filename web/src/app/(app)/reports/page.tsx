@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Count, Icon, Seg } from "@/components/ui";
 import { api, messageOf } from "@/lib/api";
@@ -9,6 +10,7 @@ import { useSession } from "@/lib/session";
 type Sales = {
   storeId: string; name: string; orders: number; returned: number; gross: number; discounts: number; deliveryFees: number; netSales: number;
   returnedValue: number; codCollected: number; onlineReceived: number; riderFeesPassedOn: number; costOfGoods: number; linesWithoutCost: number;
+  salesWithCost: number; salesWithoutCost: number; profit: number; marginPercent: number | null;
 };
 type Report = { from: string; to: string; stores: Sales[]; totals: Omit<Sales, "storeId" | "name">; bestSellers: { storeName: string; name: string; quantity: number; amount: number }[] };
 
@@ -69,10 +71,36 @@ export default function ReportsPage() {
                 <li><span>Cash received from riders and couriers</span><span className="lead" /><span className="num">{t.codCollected.toLocaleString("en-US")}</span></li>
                 <li><span>Advance payments received</span><span className="lead" /><span className="num">{t.onlineReceived.toLocaleString("en-US")}</span></li>
                 <li className="aside"><span>Rider fees (went to riders, not sales)</span><span className="lead" /><span className="num">{t.riderFeesPassedOn.toLocaleString("en-US")}</span></li>
-                <li><span>Cost of goods (estimate)</span><span className="lead" /><span className="num">{t.costOfGoods.toLocaleString("en-US")}</span></li>
               </ul>
-              {t.linesWithoutCost > 0 && <p className="note">{t.linesWithoutCost} sold item{t.linesWithoutCost === 1 ? " has" : "s have"} no cost saved, so the cost estimate is low. Add costs under Stock.</p>}
             </section>
+            <section className="section">
+              <h2>Profit</h2>
+              <p className="big num">PKR <Count value={t.profit} money /></p>
+              <p className="note">{t.marginPercent === null ? "No sold item has a cost yet." : `${t.marginPercent}% of what the items with a cost sold for`}</p>
+              <ul className="ledger">
+                <li><span>Sold for (items with a cost, after discount)</span><span className="lead" /><span className="num">{t.salesWithCost.toLocaleString("en-US")}</span></li>
+                <li className="aside"><span>What those items cost</span><span className="lead" /><span className="num">− {t.costOfGoods.toLocaleString("en-US")}</span></li>
+                <li className="total"><span>Profit</span><span className="lead" /><span className="num">{pkr(t.profit)}</span></li>
+              </ul>
+              {t.linesWithoutCost > 0 ? (
+                <div className="well" role="status">
+                  <b>Not complete yet</b>
+                  <p className="note">{t.linesWithoutCost} sold item{t.linesWithoutCost === 1 ? " has" : "s have"} no cost ({pkr(t.salesWithoutCost)} of sales), so {t.linesWithoutCost === 1 ? "it is" : "they are"} left out of this profit.</p>
+                  <Link className="btn quiet" href="/reports/costs">Fill in the costs</Link>
+                </div>
+              ) : <p className="note">Every sold item has a cost, so this profit is complete.</p>}
+              <p className="note">Profit is goods margin: what the items sold for minus what they cost. Delivery fees, rider fees and what you pay a courier are not in it.</p>
+            </section>
+            {report.stores.length > 1 && (
+              <section className="section">
+                <h2>Profit by store</h2>
+                <div className="table-wrap"><table className="table">
+                  <thead><tr><th>Store</th><th className="r">Profit</th><th className="r">Margin</th><th className="r">No cost yet</th></tr></thead>
+                  <tbody>{report.stores.map((s) => <tr key={s.storeId}><td>{s.name}</td><td className="r num">{s.profit.toLocaleString("en-US")}</td><td className="r num">{s.marginPercent === null ? "–" : `${s.marginPercent}%`}</td><td className="r num">{s.linesWithoutCost || "–"}</td></tr>)}</tbody>
+                  <tfoot><tr><td>All stores</td><td className="r num">{t.profit.toLocaleString("en-US")}</td><td className="r num">{t.marginPercent === null ? "–" : `${t.marginPercent}%`}</td><td className="r num">{t.linesWithoutCost || "–"}</td></tr></tfoot>
+                </table></div>
+              </section>
+            )}
             {!storeId && report.stores.length > 1 && (
               <section className="section">
                 <h2>By store</h2>

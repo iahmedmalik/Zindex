@@ -21,12 +21,17 @@ export default function StockPage() {
   const [open, setOpen] = useState<string | null>(null);
   const [history, setHistory] = useState<Move[]>([]);
   const [adjust, setAdjust] = useState({ delta: "", note: "" });
+  const [edit, setEdit] = useState({ price: "", cost: "" }); // the open product's price and cost, for changing them
 
   const load = useCallback(async () => {
     if (!storeId) return;
     try { setRows((await api<{ stock: StockRow[] }>(`/stores/${storeId}/stock`)).stock); } catch (e) { toast(messageOf(e), "bad"); }
   }, [storeId, toast]);
   useEffect(() => { setRows(null); setOpen(null); void load(); }, [load]);
+  useEffect(() => {
+    const r = rows?.find((x) => x.productId === open);
+    if (r) setEdit({ price: String(r.price), cost: r.cost === null ? "" : String(r.cost) });
+  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!open || !storeId) return;
     api<{ history: Move[] }>(`/stores/${storeId}/stock/${open}/history`).then((r) => setHistory(r.history)).catch(() => setHistory([]));
@@ -65,8 +70,8 @@ export default function StockPage() {
         }}>
           <label className="field"><span>Name</span><input className="input" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required /></label>
           <div className="grid2">
-            <label className="field"><span>Price (PKR)</span><input className="input num" inputMode="numeric" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value.replace(/\D/g, "") })} required /></label>
-            <label className="field"><span>Cost (for profit, optional)</span><input className="input num" inputMode="numeric" value={form.cost} onChange={(e) => setForm({ ...form, cost: e.target.value.replace(/\D/g, "") })} /></label>
+            <label className="field"><span>Price per pc (PKR)</span><input className="input num" inputMode="numeric" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value.replace(/\D/g, "") })} required /></label>
+            <label className="field"><span>Cost per pc (for profit, optional)</span><input className="input num" inputMode="numeric" value={form.cost} onChange={(e) => setForm({ ...form, cost: e.target.value.replace(/\D/g, "") })} /></label>
           </div>
           <button className="btn">Add product</button>
         </form>
@@ -82,11 +87,20 @@ export default function StockPage() {
             <li key={r.productId} className="arrive" style={{ ["--i" as string]: i }}>
               <button className="row" style={{ width: "100%", border: 0, borderBottom: "1px solid var(--line)", background: "none", textAlign: "left", cursor: "pointer", font: "inherit", color: "inherit" }} aria-expanded={open === r.productId} onClick={() => { setOpen(open === r.productId ? null : r.productId); setAdjust({ delta: "", note: "" }); }}>
                 <span className={`stage ${r.onHand <= 0 ? "returned" : "out_for_delivery"}`} aria-hidden="true" />
-                <span><span className="ttl">{r.name}</span><br /><span className="meta">{pkr(r.price)} · {r.unitsSold} sold</span></span>
+                <span><span className="ttl">{r.name}</span><br /><span className="meta">{pkr(r.price)} per pc · {r.cost === null ? "no cost yet" : `cost ${pkr(r.cost)}`} · {r.unitsSold} sold</span></span>
                 <span className="end"><b className="num" style={{ fontSize: "var(--t-lg)", color: r.onHand <= 0 ? "var(--bad)" : undefined }}><Count value={r.onHand} /></b><span className="meta">on hand</span></span>
               </button>
               <div className={`expand${open === r.productId ? " open" : ""}`}><div>
                 <div className="stack" style={{ padding: "14px 0 18px" }}>
+                  <form className="grid2" onSubmit={async (e) => {
+                    e.preventDefault();
+                    try { await api(`/stores/${storeId}/products/${r.productId}`, { method: "PATCH", body: { price: Number(edit.price), cost: edit.cost ? Number(edit.cost) : null } }); toast("Saved. New orders use it; orders already made keep their own cost."); await load(); } catch (err) { toast(messageOf(err), "bad"); }
+                  }}>
+                    <label className="field"><span>Price per pc (PKR)</span><input className="input num" inputMode="numeric" value={edit.price} onChange={(e) => setEdit({ ...edit, price: e.target.value.replace(/\D/g, "") })} required /></label>
+                    <label className="field"><span>Cost per pc (optional)</span><input className="input num" inputMode="numeric" value={edit.cost} onChange={(e) => setEdit({ ...edit, cost: e.target.value.replace(/\D/g, "") })} /></label>
+                    <button className="btn quiet" style={{ gridColumn: "1 / -1" }}>Save price and cost</button>
+                    <p className="note" style={{ gridColumn: "1 / -1" }}>A new cost applies to new orders only. Orders already made keep the cost they were sold with.</p>
+                  </form>
                   <div className="inline">
                     {[-1, 1, 10].map((d) => (
                       <button key={d} className="chip" onClick={async () => {

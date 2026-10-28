@@ -92,6 +92,12 @@ paths:
   /v1/stores/{storeId}/stock/{productId}/history:
     parameters: [{ $ref: "#/components/parameters/storeId" }, { name: productId, in: path, required: true, schema: { type: string, format: uuid } }]
     get: { tags: [Catalogue], summary: The product's stock changes, newest first, responses: { "200": { description: OK } } }
+  /v1/stores/{storeId}/missing-costs:
+    parameters: [{ $ref: "#/components/parameters/storeId" }]
+    get: { tags: [Reports], summary: "Costs to fill in: the sold lines that have no cost, grouped by product or typed name, with their sales ({ groups })", responses: { "200": { description: OK } } }
+  /v1/stores/{storeId}/missing-costs/fill:
+    parameters: [{ $ref: "#/components/parameters/storeId" }]
+    post: { tags: [Reports], summary: "Set the cost of one piece on the lines of one product (productId) or one typed name (name) that have no cost. Lines that already have a cost are never changed. { updated }", responses: { "200": { description: OK }, "400": { description: Neither productId nor name, or a bad cost } } }
   /v1/stores/{storeId}/customers:
     parameters: [{ $ref: "#/components/parameters/storeId" }]
     get: { tags: [Catalogue], summary: "Search by name or any spelling of the phone (?q=)", responses: { "200": { description: OK } } }
@@ -187,7 +193,7 @@ paths:
   /v1/reports/sales:
     get:
       tags: [Reports]
-      summary: Sales for a date range (Pakistan dates), per store and combined, with best sellers
+      summary: "Sales for a date range (Pakistan dates), per store and combined, with best sellers and profit (goods margin from the cost saved on each line; lines with no cost are counted as missing, never guessed)"
       parameters:
         - { name: from, in: query, schema: { type: string, format: date } }
         - { name: to, in: query, schema: { type: string, format: date } }

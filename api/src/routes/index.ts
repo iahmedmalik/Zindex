@@ -2,6 +2,7 @@ import { Router } from "express";
 import type { AppContext } from "../app";
 import { backupRouter } from "./backup";
 import { cardsRouter } from "./cards";
+import { costsRouter } from "./costs";
 import { customersRouter } from "./customers";
 import { demoEmails, demoGuard } from "./demo";
 import { dashboardRouter } from "./dashboard";
@@ -32,6 +33,7 @@ export function createRoutes(ctx: AppContext): Router {
   router.use("/reports", reportsRouter(ctx.db));
   router.use("/stores/:storeId/products", productsRouter(ctx.db));
   router.use("/stores/:storeId/customers", customersRouter(ctx.db));
+  router.use("/stores/:storeId/missing-costs", costsRouter(ctx.db));
   router.use("/stores/:storeId/orders", ordersRouter(ctx.db, ctx.config));
   router.use("/stores/:storeId/orders/:orderId/invoice", orderInvoiceRouter(ctx.db));
   router.use("/stores/:storeId/orders/:orderId/delivery", deliveriesRouter(ctx.db));

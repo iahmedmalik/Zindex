@@ -28,7 +28,7 @@ One owner login per account in v1. No staff roles. Open sign-up is deliberately 
 | Delivery | Optional rider details (name, phone, bike, photo, tracking link); a public delivery card link; an optional courier (name, tracking number and link) recorded by hand. The order has one status, moved by the main button; a parcel has none of its own. |
 | Money | The owner marks advance payments received and COD cash handed over; a cash-with-riders summary. |
 | Messages | Seven editable WhatsApp templates per store and `wa.me` links. |
-| Insight | Dashboard of what needs action today; sales and stock reports with Excel files; complete backup download. |
+| Insight | Dashboard of what needs action today; sales, **profit per store** and stock reports with Excel files; complete backup download. Profit is goods margin (items sold minus their cost per piece; delivery and rider fees are not in it). The cost is saved on each order line when the order is made, so a later change to a product's cost only affects new sales. A line with no cost is left out of profit, reported as missing and listed under "Costs to fill in"; it is never guessed. |
 | Shopify | Import the orders export as pending orders, each with its invoice; read-only product sync. Stock is never synced. |
 
 ## Money rules (confirmed by the owner)

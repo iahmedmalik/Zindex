@@ -27,7 +27,7 @@ On a laptop the same app has a side menu and a second column, and the invoice co
 - **Cash on delivery tracking.** Mark advance payments received and COD cash handed over; see what is still with riders.
 - **WhatsApp, free.** Seven editable message templates per store and `wa.me` links. No Business API.
 - **Courier parcels**: add the courier and tracking number only when you want them. A parcel has no status of its own; the order's one status is moved by the main button.
-- **Reports** for any dates, per store or together, with Excel files; stock reports; a full backup download.
+- **Reports and profit** for any dates, per store or together, with Excel files; stock reports; a full backup download. Each order line saves its own cost per piece, so changing a product's cost later never rewrites old sales. Profit counts only items with a cost, says what is missing, and a "Costs to fill in" list fixes the gaps on purpose; nothing is guessed.
 - **Shopify**: import the orders export as pending orders with their invoices (importing twice adds nothing) and sync products (names, prices, pictures; never stock).
 - **Try the demo.** One tap on the sign-in page opens a preloaded demo shop (three stores, orders in every stage, an invoice, a rider and a delivery card) with a short guided tour. It resets every day and has guard rails (no backups, no Shopify, small caps).
 - **By invitation.** Sign-up is limited to the shop owners' email addresses; sign-in is protected by email confirmation and rate limits.

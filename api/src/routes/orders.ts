@@ -22,6 +22,9 @@ const itemBody = z
     name: z.string().trim().min(1).max(120).optional(),
     quantity: z.number().int().min(1).max(10_000),
     unitPrice: money.optional(),
+    // The cost of one piece, optional. Left out, a product line takes the product's cost as it is today and a typed
+    // line has none (unknown): it is left out of profit until the owner fills it in.
+    unitCost: money.nullable().optional(),
   })
   .strict();
 
@@ -65,7 +68,7 @@ const createBody = z
 const updateBody = createBody.omit({ idempotencyKey: true, source: true }).partial().strict();
 const statusBody = z.object({ status: z.enum(stages) }).strict();
 
-export type OrderItem = { id: string; productId: string | null; name: string; quantity: number; unitPrice: number };
+export type OrderItem = { id: string; productId: string | null; name: string; quantity: number; unitPrice: number; unitCost: number | null };
 export type Order = {
   id: string;
   storeId: string;
@@ -102,7 +105,7 @@ const orderSelect = sql`
   o.delivery_kind, o.payment, o.payment_method, o.discount_percent, o.delivery_charge, o.rider_fee, o.subtotal,
   o.discount, o.total, o.cod_amount, o.collect_at_door, o.amount_due, o.notes, o.stock_applied, o.payment_confirmed_at, o.external_ref, o.created_at, o.updated_at,
   coalesce((select json_agg(json_build_object('id', i.id, 'productId', i.product_id, 'name', i.name,
-                                              'quantity', i.quantity, 'unitPrice', i.unit_price) order by i.position)
+                                              'quantity', i.quantity, 'unitPrice', i.unit_price, 'unitCost', i.unit_cost) order by i.position)
               from order_items i where i.order_id = o.id), '[]'::json) as items`;
 
 export async function loadOrder(tx: Tx, storeId: string, id: string): Promise<Order | undefined> {
@@ -111,20 +114,25 @@ export async function loadOrder(tx: Tx, storeId: string, id: string): Promise<Or
 }
 
 type ItemInput = z.infer<typeof itemBody>;
-type Resolved = { productId: string | null; name: string; quantity: number; unitPrice: number };
+type Resolved = { productId: string | null; name: string; quantity: number; unitPrice: number; unitCost: number | null };
 
-// Items can name a product (name and price come from the store's catalogue unless overridden)
-// or be typed by hand (name and price required).
-async function resolveItems(tx: Tx, storeId: string, items: ItemInput[]): Promise<Resolved[]> {
+// Items can name a product (name, price and cost come from the store's catalogue unless overridden)
+// or be typed by hand (name and price required, cost optional).
+// The cost is saved on the line when the order is made, so a product's cost changing later never changes an old
+// sale. `previous` is the order's own earlier lines (when a pending order is edited): an unchanged line keeps the cost
+// it already had instead of picking up today's.
+async function resolveItems(tx: Tx, storeId: string, items: ItemInput[], previous: OrderItem[] = []): Promise<Resolved[]> {
   const out: Resolved[] = [];
   for (const item of items) {
     if (item.productId) {
-      const [p] = await rows<{ name: string; price: number }>(tx, sql`select name, price from products where id = ${item.productId} and store_id = ${storeId}`);
+      const [p] = await rows<{ name: string; price: number; cost: number | null }>(tx, sql`select name, price, cost from products where id = ${item.productId} and store_id = ${storeId}`);
       if (!p) throw new HttpError(400, "One of the products is not in this store.");
-      out.push({ productId: item.productId, name: item.name ?? p.name, quantity: item.quantity, unitPrice: item.unitPrice ?? p.price });
+      const kept = previous.find((l) => l.productId === item.productId && l.unitCost !== null);
+      out.push({ productId: item.productId, name: item.name ?? p.name, quantity: item.quantity, unitPrice: item.unitPrice ?? p.price, unitCost: item.unitCost !== undefined ? item.unitCost : (kept?.unitCost ?? p.cost) });
     } else {
       if (!item.name || item.unitPrice === undefined) throw new HttpError(400, "A typed item needs a name and a price.");
-      out.push({ productId: null, name: item.name, quantity: item.quantity, unitPrice: item.unitPrice });
+      const kept = previous.find((l) => l.productId === null && l.name === item.name && l.unitCost !== null);
+      out.push({ productId: null, name: item.name, quantity: item.quantity, unitPrice: item.unitPrice, unitCost: item.unitCost !== undefined ? item.unitCost : (kept?.unitCost ?? null) });
     }
   }
   return out;
@@ -164,7 +172,7 @@ async function writeItems(tx: Tx, orderId: string, items: Resolved[]) {
   await tx.execute(sql`delete from order_items where order_id = ${orderId}`);
   for (const [position, i] of items.entries()) {
     await tx.execute(
-      sql`insert into order_items (order_id, product_id, position, name, quantity, unit_price) values (${orderId}, ${i.productId}, ${position}, ${i.name}, ${i.quantity}, ${i.unitPrice})`,
+      sql`insert into order_items (order_id, product_id, position, name, quantity, unit_price, unit_cost) values (${orderId}, ${i.productId}, ${position}, ${i.name}, ${i.quantity}, ${i.unitPrice}, ${i.unitCost})`,
     );
   }
 }
@@ -282,7 +290,7 @@ export function ordersRouter(db: Db, config: Config): Router {
       if (current.status === "cancelled" || current.status === "returned") throw new HttpError(409, `A ${current.status} order cannot be edited.`);
       if (b.items && current.stockApplied) throw new HttpError(409, "The items are locked once the order is confirmed.");
 
-      const items = b.items ? await resolveItems(tx, storeId, b.items) : current.items.map((i) => ({ productId: i.productId, name: i.name, quantity: i.quantity, unitPrice: i.unitPrice }));
+      const items = b.items ? await resolveItems(tx, storeId, b.items, current.items) : current.items.map((i) => ({ productId: i.productId, name: i.name, quantity: i.quantity, unitPrice: i.unitPrice, unitCost: i.unitCost }));
       const v = {
         discountPercent: b.discountPercent ?? current.discountPercent,
         deliveryCharge: b.deliveryCharge ?? current.deliveryCharge,

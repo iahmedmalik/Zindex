@@ -6,7 +6,7 @@ export type Stage = "pending" | "confirmed" | "packed" | "out_for_delivery" | "d
 export type Payment = "paid" | "cod" | "unpaid";
 export type DeliveryKind = "local" | "courier" | "pickup";
 
-export type OrderItem = { id: string; productId: string | null; name: string; quantity: number; unitPrice: number };
+export type OrderItem = { id: string; productId: string | null; name: string; quantity: number; unitPrice: number; unitCost: number | null };
 
 export type Order = {
   id: string;
@@ -38,7 +38,7 @@ export type Order = {
 };
 
 export type Product = { id: string; name: string; price: number; cost: number | null; active: boolean };
-export type StockRow = { productId: string; name: string; price: number; onHand: number; unitsSold: number };
+export type StockRow = { productId: string; name: string; price: number; cost: number | null; onHand: number; unitsSold: number };
 export type Customer = { id: string; name: string; phone: string; addresses: string[]; notes: string | null; orderCount?: number };
 
 export type Delivery = {

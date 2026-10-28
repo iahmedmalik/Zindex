@@ -8,7 +8,7 @@ import { previewTotals } from "@/lib/format";
 import { useSession } from "@/lib/session";
 import type { Customer, DeliveryKind, Order, Payment, Product } from "@/lib/types";
 
-type Line = { key: string; productId?: string; name: string; quantity: number; unitPrice: number };
+type Line = { key: string; productId?: string; name: string; quantity: number; unitPrice: number; unitCost: number | null };
 const methods = ["Cash", "Easypaisa", "JazzCash", "Bank transfer"];
 const digits = (v: string) => Number(v.replace(/\D/g, "")) || 0;
 
@@ -63,7 +63,7 @@ export default function NewOrderPage() {
 
   const add = (p: Product) => setLines((ls) => {
     const at = ls.findIndex((l) => l.productId === p.id);
-    return at >= 0 ? ls.map((l, i) => (i === at ? { ...l, quantity: l.quantity + 1 } : l)) : [...ls, { key: crypto.randomUUID(), productId: p.id, name: p.name, quantity: 1, unitPrice: p.price }];
+    return at >= 0 ? ls.map((l, i) => (i === at ? { ...l, quantity: l.quantity + 1 } : l)) : [...ls, { key: crypto.randomUUID(), productId: p.id, name: p.name, quantity: 1, unitPrice: p.price, unitCost: p.cost }];
   });
   const change = (k: string, patch: Partial<Line>) => setLines((ls) => ls.flatMap((l) => (l.key !== k ? [l] : patch.quantity === 0 ? [] : [{ ...l, ...patch }])));
 
@@ -77,7 +77,7 @@ export default function NewOrderPage() {
           customerName: name.trim(),
           customerPhone: phone.trim() || undefined,
           address: address.trim() || null,
-          items: lines.map((l) => (l.productId ? { productId: l.productId, quantity: l.quantity, unitPrice: l.unitPrice } : { name: l.name.trim() || "Item", quantity: l.quantity, unitPrice: l.unitPrice })),
+          items: lines.map((l) => (l.productId ? { productId: l.productId, quantity: l.quantity, unitPrice: l.unitPrice, unitCost: l.unitCost } : { name: l.name.trim() || "Item", quantity: l.quantity, unitPrice: l.unitPrice, unitCost: l.unitCost })),
           discountPercent: discount,
           deliveryKind: kind,
           riderFee: fee,
@@ -137,19 +137,23 @@ export default function NewOrderPage() {
               {p.name} <span className="price num">{p.price.toLocaleString("en-US")}</span><span className="plus num">{qtyOf(p.id) || ""}</span>
             </button>
           ))}
-          <button type="button" className="chip" style={{ borderStyle: "dashed" }} onClick={() => setLines((ls) => [...ls, { key: crypto.randomUUID(), name: "", quantity: 1, unitPrice: 0 }])}><Icon name="plus" size={16} />Typed item</button>
+          <button type="button" className="chip" style={{ borderStyle: "dashed" }} onClick={() => setLines((ls) => [...ls, { key: crypto.randomUUID(), name: "", quantity: 1, unitPrice: 0, unitCost: null }])}><Icon name="plus" size={16} />Typed item</button>
         </div>
         {products.length === 0 && <p className="note">No products in this store yet. Add them under Stock, or type an item.</p>}
         <ul className="rows" aria-live="polite">
           {lines.map((l) => (
-            <li key={l.key} className="arrive" style={{ display: "grid", gridTemplateColumns: "1fr auto auto", gap: 10, alignItems: "center", padding: "10px 0", borderBottom: "1px dotted var(--line)" }}>
+            <li key={l.key} className="arrive" style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 10, alignItems: "center", padding: "10px 0", borderBottom: "1px dotted var(--line)" }}>
               {l.productId ? <span>{l.name}</span> : <input className="input" placeholder="Item name" aria-label="Item name" value={l.name} onChange={(e) => change(l.key, { name: e.target.value })} />}
-              <input className="input num" inputMode="numeric" aria-label={`Price of ${l.name || "item"}`} style={{ width: 86, minHeight: 38, padding: "6px 10px" }} value={l.unitPrice || ""} placeholder="Price" onChange={(e) => change(l.key, { unitPrice: digits(e.target.value) })} />
               <span style={{ display: "inline-grid", gridTemplateColumns: "38px 30px 38px", alignItems: "center", textAlign: "center", border: "1px solid var(--line)", borderRadius: "var(--r-md)", background: "var(--surface)" }}>
                 <button type="button" className="iconbtn" style={{ width: 38, height: 38, border: 0 }} aria-label={`One fewer ${l.name}`} onClick={() => change(l.key, { quantity: l.quantity - 1 })}><Icon name="minus" size={16} /></button>
                 <b className="num"><Count value={l.quantity} /></b>
                 <button type="button" className="iconbtn" style={{ width: 38, height: 38, border: 0 }} aria-label={`One more ${l.name}`} onClick={() => change(l.key, { quantity: l.quantity + 1 })}><Icon name="plus" size={16} /></button>
               </span>
+              {/* Both are for one piece. The cost is saved on this line, so a later change to the product's cost never changes it. */}
+              <div style={{ gridColumn: "1 / -1", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                <label className="field"><span>Price per pc</span><input className="input num" inputMode="numeric" aria-label={`Price of ${l.name || "item"} per pc`} style={{ minHeight: 38, padding: "6px 10px" }} value={l.unitPrice || ""} placeholder="0" onChange={(e) => change(l.key, { unitPrice: digits(e.target.value) })} /></label>
+                <label className="field"><span>Cost per pc (optional)</span><input className="input num" inputMode="numeric" aria-label={`Cost of ${l.name || "item"} per pc`} style={{ minHeight: 38, padding: "6px 10px" }} value={l.unitCost ?? ""} placeholder="not set" onChange={(e) => change(l.key, { unitCost: e.target.value.replace(/\D/g, "") === "" ? null : digits(e.target.value) })} /></label>
+              </div>
             </li>
           ))}
         </ul>
