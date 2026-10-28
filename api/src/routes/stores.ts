@@ -20,7 +20,15 @@ const createBody = z
   })
   .strict();
 
-const updateBody = createBody.partial().strict();
+// On update, phone, email and address may be null, which clears them.
+const updateBody = createBody
+  .extend({
+    phone: createBody.shape.phone.nullable(),
+    email: createBody.shape.email.nullable(),
+    address: createBody.shape.address.nullable(),
+  })
+  .partial()
+  .strict();
 
 // The public shape of a store: the invoice counter stays inside the database.
 const columns = {

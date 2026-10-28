@@ -19,7 +19,9 @@ function StoreEditor({ store, onSaved }: { store?: Store; onSaved: () => Promise
   return (
     <form className="stack" onSubmit={async (e) => {
       e.preventDefault();
-      const body = { name: f.name.trim(), invoicePrefix: f.invoicePrefix || undefined, phone: f.phone.trim() || undefined, email: f.email.trim() || undefined, address: f.address.trim() || undefined, accent: f.accent };
+      // Editing: an emptied field is sent as null so the API clears it. Creating: it is simply left out.
+      const empty = store ? null : undefined;
+      const body = { name: f.name.trim(), invoicePrefix: f.invoicePrefix || undefined, phone: f.phone.trim() || empty, email: f.email.trim() || empty, address: f.address.trim() || empty, accent: f.accent };
       try {
         await api(store ? `/stores/${store.id}` : "/stores", { method: store ? "PATCH" : "POST", body });
         toast(store ? "Store saved" : `${body.name} added`);

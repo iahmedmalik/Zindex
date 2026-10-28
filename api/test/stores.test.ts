@@ -34,6 +34,17 @@ describe("stores", () => {
     expect((await request(t.app).get("/v1/stores").set("Cookie", owner.cookie)).body.stores).toHaveLength(0);
   });
 
+  it("clears a store's phone, email and address when they are sent as null", async () => {
+    const owner = await newVerifiedOwner(t.app, t.mailer);
+    const made = await createStore(owner.cookie, { name: newId("Clear"), phone: "0300 1", email: "shop@example.com", address: "Lahore" });
+    expect(made.body.store).toMatchObject({ phone: "0300 1", email: "shop@example.com", address: "Lahore" });
+    const cleared = await request(t.app).patch(`/v1/stores/${made.body.store.id}`).set("Cookie", owner.cookie).send({ phone: null, email: null, address: null });
+    expect(cleared.status).toBe(200);
+    expect(cleared.body.store).toMatchObject({ phone: null, email: null, address: null });
+    const badName = await request(t.app).patch(`/v1/stores/${made.body.store.id}`).set("Cookie", owner.cookie).send({ name: null });
+    expect(badName.status).toBe(400);
+  });
+
   it("keeps two owners' stores apart", async () => {
     const a = await newVerifiedOwner(t.app, t.mailer, "Owner A");
     const b = await newVerifiedOwner(t.app, t.mailer, "Owner B");
