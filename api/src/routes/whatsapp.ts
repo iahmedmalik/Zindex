@@ -68,7 +68,7 @@ export function whatsappRouter(db: Db): Router {
         store: store?.name,
         total: order.total.toLocaleString("en-US"),
         collect: order.collectAtDoor.toLocaleString("en-US"),
-        amount_due: order.amountDue.toLocaleString("en-US"),
+        amount_due: Math.max(order.expected - order.paid, 0).toLocaleString("en-US"), // what is still to pay, not the whole total
         invoice_no: invoice?.number ?? "",
         rider_name: delivery?.riderName,
         rider_phone: delivery?.riderPhone,

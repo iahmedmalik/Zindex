@@ -10,7 +10,9 @@ import { useSession } from "@/lib/session";
 import type { Board, BoardCounts, Order } from "@/lib/types";
 
 type Row = Order & { storeName: string };
-type Cod = { expected: number; collected: number; outstanding: number };
+type Bucket = { orders: number; amount: number };
+type Cod = { expected: number; collected: number; outstanding: number; buckets: { riders: Bucket; customers: Bucket; couriers: Bucket } };
+const noBuckets = { riders: { orders: 0, amount: 0 }, customers: { orders: 0, amount: 0 }, couriers: { orders: 0, amount: 0 } };
 
 const action: Partial<Record<Order["status"], { to: string; label: string }>> = {
   pending: { to: "confirmed", label: "Confirm" },
@@ -37,7 +39,14 @@ export default function TodayPage() {
       ]);
       setBoard(b);
       setOrders(lists.flat().sort((x, y) => y.createdAt.localeCompare(x.createdAt)));
-      setCod(cods.reduce((n, c) => ({ expected: n.expected + c.expected, collected: n.collected + c.collected, outstanding: n.outstanding + c.outstanding }), { expected: 0, collected: 0, outstanding: 0 }));
+      setCod(cods.reduce((n, c) => ({
+        expected: n.expected + c.expected, collected: n.collected + c.collected, outstanding: n.outstanding + c.outstanding,
+        buckets: {
+          riders: { orders: n.buckets.riders.orders + c.buckets.riders.orders, amount: n.buckets.riders.amount + c.buckets.riders.amount },
+          customers: { orders: n.buckets.customers.orders + c.buckets.customers.orders, amount: n.buckets.customers.amount + c.buckets.customers.amount },
+          couriers: { orders: n.buckets.couriers.orders + c.buckets.couriers.orders, amount: n.buckets.couriers.amount + c.buckets.couriers.amount },
+        },
+      }), { expected: 0, collected: 0, outstanding: 0, buckets: noBuckets }));
       setError("");
     } catch (err) {
       setError(messageOf(err));
@@ -178,7 +187,16 @@ export default function TodayPage() {
               <li><span>Received</span><span className="lead" /><span className="num">PKR <Count value={cod.collected} money /></span></li>
               <li className="total"><span>Still to collect</span><span className="lead" /><span className="num">PKR <Count value={cod.outstanding} money /></span></li>
             </ul>
-            <p className="note">Cash-on-delivery orders that are out or delivered and not paid to you yet, from riders and from couriers. <Link href="/orders?view=cash">See these orders</Link> and mark each one when the cash arrives.</p>
+            <ul className="ledger" aria-label="Who owes it">
+              {([["riders", "With riders"], ["customers", "From customers"], ["couriers", "From couriers"]] as const).map(([key, label]) => (
+                <li key={key} style={{ fontSize: "var(--t-sm)" }}>
+                  <Link href={`/orders?view=cash&bucket=${key}`} style={{ textDecoration: "none", display: "contents" }}>
+                    <span>{label}{cod.buckets[key].orders > 0 && <span className="note"> · {cod.buckets[key].orders} order{cod.buckets[key].orders === 1 ? "" : "s"}</span>}</span><span className="lead" /><span className="num">PKR {cod.buckets[key].amount.toLocaleString("en-US")}</span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+            <p className="note">Cash-on-delivery cash still with riders and couriers, and what pay-later customers have not paid yet once their order is delivered. <Link href="/orders?view=cash">See these orders</Link> and record each payment as it comes in.</p>
           </section>
         )}
         {!storeId && board.stores.length > 1 && (

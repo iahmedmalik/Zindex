@@ -11,7 +11,7 @@ const fmt = (n: number) => n.toLocaleString("en-US");
 
 type Card = {
   store: { name: string; phone: string | null; email: string | null; address: string | null; logoUrl: string | null; accent: string };
-  order: { orderNo: number; status: string; customerName: string; address: string | null; payment: string; items: { name: string; quantity: number }[]; subtotal: number; discount: number; deliveryCharge: number; total: number; riderFee: number; codAmount: number; collectAtDoor: number };
+  order: { orderNo: number; status: string; customerName: string; address: string | null; payment: string; items: { name: string; quantity: number }[]; subtotal: number; discount: number; deliveryCharge: number; total: number; riderFee: number; codAmount: number; collectAtDoor: number; paid: number };
   delivery: { service: string | null; riderName: string | null; riderPhone: string | null; bikeNumber: string | null; riderPhotoUrl: string | null; hasPhoto: boolean; riderPhotoTakenAt: string | null; trackingUrl: string | null; riderScreenshotUrl: string | null } | null;
   expiresAt: string;
 };
@@ -118,12 +118,16 @@ export default async function CardPage({ params }: { params: Promise<{ token: st
           <section className="slip arrive" style={{ ["--i" as string]: 6 }} aria-label="What to pay">
             <h2>{order.collectAtDoor === 0 ? "Nothing to pay at the door" : "Please have ready"}</h2>
             {order.collectAtDoor > 0 && <p className="due num">PKR {fmt(order.collectAtDoor)}</p>}
-            <p className="mut">{order.collectAtDoor === 0 ? "Your order is paid." : order.codAmount > 0 ? `${fmt(order.codAmount)} for your order${order.riderFee > 0 ? ` and ${fmt(order.riderFee)} for the rider` : ""}.` : "That is the rider's delivery fee. Your order is already paid."}</p>
+            <p className="mut">{order.payment === "unpaid"
+              ? `${order.riderFee > 0 ? "That is the rider's delivery fee. " : ""}Your order total of ${fmt(order.total)} is paid to ${store.name} later.`
+              : order.collectAtDoor === 0 ? "Your order is paid." : order.codAmount > 0 ? `${fmt(order.codAmount)} for your order${order.riderFee > 0 ? ` and ${fmt(order.riderFee)} for the rider` : ""}.` : "That is the rider's delivery fee. Your order is already paid."}</p>
             {order.items.map((i, n) => <div key={n} className="ln"><span>{i.quantity} × {i.name}</span></div>)}
             {order.discount > 0 && <div className="ln"><span>Discount</span><span className="num">− {fmt(order.discount)}</span></div>}
             {order.deliveryCharge > 0 && <div className="ln"><span>Delivery fee</span><span className="num">{fmt(order.deliveryCharge)}</span></div>}
             <div className="ln tot"><span>Order total</span><span className="num">{fmt(order.total)}</span></div>
-            {order.codAmount === 0 && <div className="ln"><span>Already paid</span><span className="num">− {fmt(order.total)}</span></div>}
+            {order.payment === "paid" && <div className="ln"><span>Already paid</span><span className="num">− {fmt(order.total)}</span></div>}
+            {order.payment === "unpaid" && order.paid > 0 && <div className="ln"><span>Paid so far</span><span className="num">− {fmt(order.paid)}</span></div>}
+            {order.payment === "unpaid" && <div className="ln tot"><span>Still to pay {store.name}</span><span className="num">{fmt(Math.max(order.total - order.paid, 0))}</span></div>}
             {order.riderFee > 0 && <div className="ln"><span>Rider fee, to the rider</span><span className="num">{fmt(order.riderFee)}</span></div>}
             {(store.email || store.address) && <div className="ln mut contact"><span>{[store.address, store.email].filter(Boolean).join(" · ")}</span></div>}
           </section>

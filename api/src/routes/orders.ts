@@ -94,6 +94,11 @@ export type Order = {
   notes: string | null;
   stockApplied: boolean;
   paymentConfirmedAt: Date | null;
+  /** What the shop expects to collect on this order: the cash-on-delivery amount for COD, the total otherwise. */
+  expected: number;
+  /** What has been paid so far (the sum of the order's payments). */
+  paid: number;
+  deliveredAt: Date | null;
   externalRef: string | null;
   createdAt: Date;
   updatedAt: Date;
@@ -103,7 +108,9 @@ export type Order = {
 const orderSelect = sql`
   o.id, o.store_id, o.order_no, o.customer_id, o.customer_name, o.customer_phone, o.address, o.source, o.status,
   o.delivery_kind, o.payment, o.payment_method, o.discount_percent, o.delivery_charge, o.rider_fee, o.subtotal,
-  o.discount, o.total, o.cod_amount, o.collect_at_door, o.amount_due, o.notes, o.stock_applied, o.payment_confirmed_at, o.external_ref, o.created_at, o.updated_at,
+  o.discount, o.total, o.cod_amount, o.collect_at_door, o.amount_due, o.notes, o.stock_applied, o.payment_confirmed_at, o.delivered_at, o.external_ref, o.created_at, o.updated_at,
+  case when o.payment = 'cod' then o.cod_amount else o.total end as expected,
+  coalesce((select sum(p.amount) from order_payments p where p.order_id = o.id), 0)::int as paid,
   coalesce((select json_agg(json_build_object('id', i.id, 'productId', i.product_id, 'name', i.name,
                                               'quantity', i.quantity, 'unitPrice', i.unit_price, 'unitCost', i.unit_cost) order by i.position)
               from order_items i where i.order_id = o.id), '[]'::json) as items`;
@@ -217,6 +224,8 @@ export function ordersRouter(db: Db, config: Config): Router {
     const method = typeof req.query.method === "string" ? req.query.method : "";
     // The views the Today tiles open (same rules as the dashboard counts).
     const view = typeof req.query.view === "string" ? req.query.view : "";
+    const bucket = typeof req.query.bucket === "string" ? req.query.bucket : "";
+    if (bucket && !["riders", "customers", "couriers"].includes(bucket)) throw new HttpError(400, "Unknown bucket.");
     if (view && !["needs_rider", "cash", "delivered_today"].includes(view)) throw new HttpError(400, "Unknown view.");
     const list = await asOwner(db, req.user!.id, (tx) =>
       rows<Order>(
@@ -228,8 +237,10 @@ export function ordersRouter(db: Db, config: Config): Router {
               and (${method} = '' or o.payment_method = ${method})
               and (${view} <> 'needs_rider' or (o.status = 'packed' and o.delivery_kind = 'local'
                    and not exists (select 1 from deliveries d where d.order_id = o.id and d.rider_name is not null)))
-              and (${view} <> 'cash' or (o.payment = 'cod' and o.cod_amount > 0 and o.status in ('out_for_delivery', 'delivered')
-                   and o.payment_confirmed_at is null))
+              and (${view} <> 'cash' or (
+                    ((o.payment = 'cod' and o.cod_amount > 0 and o.status in ('out_for_delivery', 'delivered')) or (o.payment = 'unpaid' and o.status = 'delivered'))
+                    and (case when o.payment = 'cod' then o.cod_amount else o.total end) > coalesce((select sum(p.amount) from order_payments p where p.order_id = o.id), 0)
+                    and (${bucket} = '' or ${bucket} = (case when o.payment = 'unpaid' then 'customers' when o.delivery_kind = 'courier' then 'couriers' when o.delivery_kind = 'local' then 'riders' else 'customers' end))))
               and (${view} <> 'delivered_today' or (o.status = 'delivered'
                    and (o.created_at at time zone 'Asia/Karachi')::date = (now() at time zone 'Asia/Karachi')::date))
               and (${q} = '' or o.customer_name ilike ${"%" + q + "%"}
@@ -289,6 +300,9 @@ export function ordersRouter(db: Db, config: Config): Router {
       if (!current) throw new HttpError(404, "Order not found.");
       if (current.status === "cancelled" || current.status === "returned") throw new HttpError(409, `A ${current.status} order cannot be edited.`);
       if (b.items && current.stockApplied) throw new HttpError(409, "The items are locked once the order is confirmed.");
+      if (current.paid > 0 && (b.items !== undefined || b.discountPercent !== undefined || b.deliveryCharge !== undefined || b.riderFee !== undefined || b.payment !== undefined)) {
+        throw new HttpError(409, "Payments are recorded on this order. Undo them first to change the amounts.");
+      }
 
       const items = b.items ? await resolveItems(tx, storeId, b.items, current.items) : current.items.map((i) => ({ productId: i.productId, name: i.name, quantity: i.quantity, unitPrice: i.unitPrice, unitCost: i.unitCost }));
       const v = {
@@ -329,7 +343,7 @@ export function ordersRouter(db: Db, config: Config): Router {
       const current = await loadOrder(tx, storeId, id);
       if (!current) throw new HttpError(404, "Order not found.");
       if (!canMove(current.status, status)) throw new HttpError(409, `An order that is ${current.status.replace(/_/g, " ")} cannot become ${status.replace(/_/g, " ")}.`);
-      await tx.execute(sql`update orders set status = ${status}, updated_at = now() where id = ${id}`);
+      await tx.execute(sql`update orders set status = ${status}, updated_at = now(), delivered_at = case when ${status} = 'delivered' then now() else delivered_at end where id = ${id}`);
       // Confirming is the one moment stock moves. A zero-stock sale still goes through; the
       // warning tells the owner which products are now below zero.
       const stockWarnings: StockWarning[] = status === "confirmed" ? await deductForOrder(tx, storeId, id) : [];

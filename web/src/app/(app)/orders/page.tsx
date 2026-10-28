@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Picker } from "@/components/Picker";
 import { Icon, useToast } from "@/components/ui";
@@ -14,6 +15,13 @@ const stageOptions = filters.map((f) => ({ value: f, label: f ? stageLabel[f] : 
 // The views the Today tiles open. They combine with the stage and payment dropdowns.
 const views = { needs_rider: "Needs a rider", cash: "Cash to collect", delivered_today: "Delivered today" } as const;
 type View = keyof typeof views | "";
+const bucketOptions = [{ value: "", label: "Everyone" }, { value: "riders", label: "With riders" }, { value: "customers", label: "From customers" }, { value: "couriers", label: "From couriers" }];
+const bucketOf = (o: Order) => (o.payment === "unpaid" ? "From the customer" : o.deliveryKind === "courier" ? "With the courier" : o.deliveryKind === "local" ? "With the rider" : "From the customer");
+const delivered = (iso: string | null) => {
+  if (!iso) return "";
+  const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000);
+  return days <= 0 ? "delivered today" : days === 1 ? "delivered yesterday" : `delivered ${days} days ago`;
+};
 const payOptions = [{ value: "", label: "Any" }, { value: "cod", label: "COD" }, { value: "paid", label: "Paid" }, { value: "unpaid", label: "Pay later" }];
 
 // Every order for the chosen store (or all stores), searchable by customer, phone or #number.
@@ -23,6 +31,8 @@ export default function OrdersPage() {
   const [status, setStatus] = useState<Stage | "">("");
   const [payment, setPayment] = useState("");
   const [view, setView] = useState<View>("");
+  const [bucket, setBucket] = useState("");
+  const router = useRouter();
   const [tick, setTick] = useState(0);
   const toast = useToast();
   const [orders, setOrders] = useState<(Order & { storeName: string })[] | null>(null);
@@ -34,6 +44,8 @@ export default function OrdersPage() {
     if (fromUrl && (filters as string[]).includes(fromUrl)) setStatus(fromUrl as Stage);
     const v = params.get("view");
     if (v && v in views) setView(v as View);
+    const bk = params.get("bucket");
+    if (bk && bucketOptions.some((b) => b.value === bk)) setBucket(bk);
     if (params.get("q")) setQ(params.get("q")!);
   }, []);
 
@@ -47,6 +59,7 @@ export default function OrdersPage() {
         if (status) qs.set("status", status);
         if (payment) qs.set("payment", payment);
         if (view) qs.set("view", view);
+        if (view === "cash" && bucket) qs.set("bucket", bucket);
         const lists = await Promise.all(targets.map(async (s) => (await api<{ orders: Order[] }>(`/stores/${s.id}/orders?${qs}`)).orders.map((o) => ({ ...o, storeName: s.name }))));
         if (live) { setOrders(lists.flat().sort((a, b) => b.createdAt.localeCompare(a.createdAt))); setError(""); }
       } catch (err) {
@@ -54,13 +67,24 @@ export default function OrdersPage() {
       }
     }, 200);
     return () => { live = false; clearTimeout(t); };
-  }, [q, status, payment, view, tick, storeId, stores]);
+  }, [q, status, payment, view, bucket, tick, storeId, stores]);
 
+  // One tap records what is left on the order: the COD cash handed over, or the pay-later customer's payment.
   async function received(o: Order) {
     try {
-      await api(`/stores/${o.storeId}/orders/${o.id}/payment/cash-handover`, { method: "POST", body: {} });
-      toast(`#${o.orderNo} cash received`);
+      if (o.payment === "cod") await api(`/stores/${o.storeId}/orders/${o.id}/payment/cash-handover`, { method: "POST", body: {} });
+      else await api(`/stores/${o.storeId}/orders/${o.id}/payments`, { method: "POST", body: { amount: o.expected - o.paid } });
+      toast(`#${o.orderNo} ${o.payment === "cod" ? "cash" : "payment"} received`);
       setTick((n) => n + 1);
+    } catch (err) {
+      toast(messageOf(err), "bad");
+    }
+  }
+  // The shop's own payment reminder message, with what is still to pay filled in, opened in WhatsApp.
+  async function remind(o: Order) {
+    try {
+      const m = await api<{ waLink: string }>(`/stores/${o.storeId}/orders/${o.id}/whatsapp?template=payment_reminder`);
+      window.open(m.waLink, "_blank", "noopener");
     } catch (err) {
       toast(messageOf(err), "bad");
     }
@@ -86,6 +110,7 @@ export default function OrdersPage() {
           <Picker label="Stage" value={status} options={stageOptions} onChange={setStatus} />
           <Picker label="Payment" value={payment} options={payOptions} onChange={setPayment} />
         </div>
+        {view === "cash" && <div className="pickers"><Picker label="From" value={bucket} options={bucketOptions} onChange={setBucket} /></div>}
       </div>
       {error && <p className="error" role="alert">{error}</p>}
       {!orders ? <div className="skel" aria-busy="true"><span /><span /><span /></div> : orders.length === 0 ? (
@@ -94,16 +119,35 @@ export default function OrdersPage() {
         <ul className="rows">
           {orders.map((o, i) => (
             <li key={o.id} className="arrive" style={{ ["--i" as string]: i }}>
+              {view === "cash" ? (
+                <Link className="row" href={`/orders/${o.storeId}/${o.id}`} style={{ gridTemplateColumns: "auto 1fr", alignItems: "start" }}>
+                  <span className={`stage ${o.status}`} aria-hidden="true" style={{ marginTop: 8 }} />
+                  <span className="stack" style={{ gap: 6 }}>
+                    <span className="inline between" style={{ gap: 10, flexWrap: "nowrap" }}>
+                      <span className="ttl">#{o.orderNo} {o.customerName}</span>
+                      <span className="amt num">{pkr(o.expected - o.paid)}</span>
+                    </span>
+                    <span className="meta">{!storeId && `${o.storeName} · `}{bucketOf(o).toLowerCase()} · {delivered(o.deliveredAt) || when(o.createdAt)}</span>
+                    <span className="inline" style={{ gap: 14, flexWrap: "wrap" }}>
+                      <button className="btn small quiet" onClick={(e) => { e.preventDefault(); void received(o); }}>{o.payment === "cod" ? "Got the cash" : "Got the payment"}</button>
+                      <button className="linkbtn" onClick={(e) => { e.preventDefault(); router.push(`/orders/${o.storeId}/${o.id}#payments`); }}>Add payment</button>
+                      {o.payment === "unpaid" && o.customerPhone && <button className="linkbtn" onClick={(e) => { e.preventDefault(); void remind(o); }}>Remind</button>}
+                    </span>
+                  </span>
+                </Link>
+              ) : (
               <Link className="row" href={`/orders/${o.storeId}/${o.id}`}>
                 <span className={`stage ${o.status}`} aria-hidden="true" />
-                <span><span className="ttl">#{o.orderNo} {o.customerName}</span><br /><span className="meta">{!storeId && `${o.storeName} · `}{view === "cash" ? `${o.deliveryKind === "courier" ? "courier" : o.deliveryKind === "pickup" ? "pickup" : "rider"} · ` : ""}{when(o.createdAt)}{o.externalRef ? ` · Shopify ${o.externalRef}` : ""}</span></span>
+                <span>
+                  <span className="ttl">#{o.orderNo} {o.customerName}</span><br />
+                  <span className="meta">{!storeId && `${o.storeName} · `}{when(o.createdAt)}{o.externalRef ? ` · Shopify ${o.externalRef}` : ""}</span>
+                </span>
                 <span className="end">
-                  <span className="amt num">{pkr(view === "cash" ? o.codAmount : o.total)}</span>
-                  {view === "cash"
-                    ? <button className="btn small quiet" onClick={(e) => { e.preventDefault(); void received(o); }}>Got the cash</button>
-                    : <span className="badge">{stageLabel[o.status]}</span>}
+                  <span className="amt num">{pkr(o.total)}</span>
+                  <span className="badge">{stageLabel[o.status]}</span>
                 </span>
               </Link>
+              )}
             </li>
           ))}
         </ul>

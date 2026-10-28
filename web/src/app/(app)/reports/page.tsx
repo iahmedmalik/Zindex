@@ -12,6 +12,7 @@ type Sales = {
   returnedValue: number; codCollected: number; onlineReceived: number; riderFeesPassedOn: number; costOfGoods: number; linesWithoutCost: number;
   salesWithCost: number; salesWithoutCost: number; profit: number; marginPercent: number | null;
 };
+type Received = { total: number; payments: number; byMethod: { name: string; amount: number }[]; byStore: { name: string; amount: number }[] };
 type Report = { from: string; to: string; stores: Sales[]; totals: Omit<Sales, "storeId" | "name">; bestSellers: { storeName: string; name: string; quantity: number; amount: number }[] };
 
 const pk = (d: Date) => new Date(d.getTime() + 5 * 3600_000).toISOString().slice(0, 10);
@@ -30,6 +31,7 @@ export default function ReportsPage() {
   const [kind, setKind] = useState<"today" | "week" | "month" | "custom">("week");
   const [custom, setCustom] = useState({ from: "", to: "" });
   const [report, setReport] = useState<Report | null>(null);
+  const [received, setReceived] = useState<Received | null>(null);
   const [error, setError] = useState("");
   const [from, to] = range(kind, custom.from, custom.to);
   const qs = `from=${from}&to=${to}${storeId ? `&storeId=${storeId}` : ""}`;
@@ -37,7 +39,9 @@ export default function ReportsPage() {
   useEffect(() => {
     let live = true;
     setReport(null);
+    setReceived(null);
     api<Report>(`/reports/sales?${qs}`).then((r) => { if (live) { setReport(r); setError(""); } }).catch((e) => live && setError(messageOf(e)));
+    api<Received>(`/reports/received?${qs}`).then((r) => { if (live) setReceived(r); }).catch(() => undefined);
     return () => { live = false; };
   }, [qs]);
 
@@ -68,10 +72,26 @@ export default function ReportsPage() {
                 <li><span>Courier delivery fees</span><span className="lead" /><span className="num">{t.deliveryFees.toLocaleString("en-US")}</span></li>
                 {t.returnedValue > 0 && <li className="aside"><span>Returned</span><span className="lead" /><span className="num">− {t.returnedValue.toLocaleString("en-US")}</span></li>}
                 <li className="total"><span>Net sales</span><span className="lead" /><span className="num">{pkr(t.netSales)}</span></li>
-                <li><span>Cash received from riders and couriers</span><span className="lead" /><span className="num">{t.codCollected.toLocaleString("en-US")}</span></li>
-                <li><span>Advance payments received</span><span className="lead" /><span className="num">{t.onlineReceived.toLocaleString("en-US")}</span></li>
                 <li className="aside"><span>Rider fees (went to riders, not sales)</span><span className="lead" /><span className="num">{t.riderFeesPassedOn.toLocaleString("en-US")}</span></li>
               </ul>
+            </section>
+            <section className="section">
+              <h2>Money received</h2>
+              <p className="note">Counted by the day each payment came in, not by the order&apos;s date: cash from riders and couriers, advance payments, and what pay-later customers paid, in chunks or all at once.</p>
+              {!received ? <div className="skel"><span /></div> : received.total === 0 ? <p className="note">No payment came in during this period.</p> : (
+                <>
+                  <p className="big num">PKR <Count value={received.total} money /></p>
+                  <p className="note">{received.payments} payment{received.payments === 1 ? "" : "s"}</p>
+                  <ul className="ledger">
+                    {received.byMethod.map((m) => <li key={m.name}><span>{m.name}</span><span className="lead" /><span className="num">{m.amount.toLocaleString("en-US")}</span></li>)}
+                  </ul>
+                  {received.byStore.length > 1 && (
+                    <ul className="ledger">
+                      {received.byStore.map((st) => <li key={st.name} className="aside"><span>{st.name}</span><span className="lead" /><span className="num">{st.amount.toLocaleString("en-US")}</span></li>)}
+                    </ul>
+                  )}
+                </>
+              )}
             </section>
             <section className="section">
               <h2>Profit</h2>

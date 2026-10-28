@@ -17,7 +17,7 @@ function payWords(order: Order) {
       ? { chip: "Paid", label: "Only the rider's fee at the door", sub: "Your order is paid in full" }
       : { chip: "Paid", label: "Nothing to pay at the door", sub: "Your order is paid in full" };
   }
-  return { chip: "Unpaid", label: rider > 0 ? "At the door: the rider's fee" : "Nothing to pay at the door", sub: `The order total of ${pkr(order.total)} is not collected at the door` };
+  return { chip: "Pay later", label: rider > 0 ? "At the door: the rider's fee" : "Nothing to pay at the door", sub: `The order total of ${pkr(order.total)} is paid to the shop later` };
 }
 
 /**
@@ -80,6 +80,9 @@ export const InvoicePaper = forwardRef<HTMLElement, { invoice: Invoice; order: O
     </div>
   );
 
+  const later = order.payment === "unpaid" && order.expected - order.paid > 0 && (
+    <p className="iv-fee"><b>To pay the shop later: {pkr(order.expected - order.paid)}</b>{order.paid > 0 ? ` (paid so far ${pkr(order.paid)} of ${pkr(order.total)})` : ""}</p>
+  );
   const fee = order.riderFee > 0 && <p className="iv-fee">The rider&apos;s {pkr(order.riderFee)} is paid straight to the rider and is not part of this invoice total.</p>;
 
   return (
@@ -113,9 +116,9 @@ export const InvoicePaper = forwardRef<HTMLElement, { invoice: Invoice; order: O
           </div>
         )}
         {items}
-        {compact ? <>{sum}{doorCard}{fee}</> : (
+        {compact ? <>{sum}{doorCard}{later}{fee}</> : (
           <div className="iv-cols" style={{ marginTop: 8, alignItems: "start" }}>
-            <div>{fee}</div>
+            <div>{later}{fee}</div>
             <div>{sum}{doorCard}</div>
           </div>
         )}

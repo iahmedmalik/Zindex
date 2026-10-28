@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { PaymentsBox } from "@/components/payments-box";
 import { Receipt } from "@/components/receipt";
 import { DoneButton, Icon, Journey, Seg, useToast } from "@/components/ui";
 import { api, messageOf } from "@/lib/api";
@@ -97,7 +98,8 @@ export default function OrderPage() {
   const closed = order.status === "cancelled" || order.status === "returned";
   const step = next[order.status];
   const at = stepOf[order.status];
-  const cashDue = order.payment === "cod" && order.codAmount > 0 && order.status === "delivered" && !order.paymentConfirmedAt;
+  const owing = order.expected - order.paid;
+  const cashDue = ((order.payment === "cod" && order.codAmount > 0) || order.payment === "unpaid") && order.status === "delivered" && owing > 0;
 
   return (
     <div className="stack store-scope" style={{ gap: 28, ["--store-base" as string]: store?.accent }}>
@@ -247,12 +249,7 @@ export default function OrderPage() {
             <div className="paper stack" style={{ gap: 6 }}>
               <b>{order.payment === "cod" ? "Cash on delivery" : order.payment === "paid" ? `Paid in advance${order.paymentMethod ? ` · ${order.paymentMethod}` : ""}` : "Pay later"}</b>
               <span>{order.collectAtDoor === 0 ? "Nothing to collect at the door." : order.codAmount > 0 ? <>{order.customerName.split(" ")[0]} hands the rider <b className="num">{pkr(order.collectAtDoor)}</b>.{order.riderFee > 0 && <> The rider keeps {order.riderFee.toLocaleString("en-US")} and brings <b className="num">{order.codAmount.toLocaleString("en-US")}</b> back to you.</>}</> : <>The rider collects only his fee, <b className="num">{pkr(order.riderFee)}</b>.</>}</span>
-              {!closed && order.payment === "paid" && (order.paymentConfirmedAt
-                ? <span className="inline"><span className="badge ok">Payment received</span><button className="linkbtn" onClick={() => run(async () => { await api(`${base}/payment`, { method: "DELETE" }); return "Payment marked not received"; })}>Undo</button></span>
-                : <button className="btn small quiet" disabled={busy} onClick={() => run(async () => { await api(`${base}/payment/confirm`, { method: "POST" }); return "Payment marked received"; })}>I can see the payment</button>)}
-              {!closed && order.payment === "cod" && order.codAmount > 0 && (order.status === "out_for_delivery" || order.status === "delivered") && (order.paymentConfirmedAt
-                ? <span className="inline"><span className="badge ok">Cash received</span><button className="linkbtn" onClick={() => run(async () => { await api(`${base}/payment`, { method: "DELETE" }); return "Cash marked not received"; })}>Undo</button></span>
-                : <button className="btn small quiet" disabled={busy} onClick={() => run(async () => { await api(`${base}/payment/cash-handover`, { method: "POST" }); return "Cash received · order settled"; })}><Icon name="cash" size={18} />{order.deliveryKind === "courier" ? "Courier paid the cash" : order.deliveryKind === "pickup" ? "Cash received" : "Rider handed over the cash"}</button>)}
+              {!closed && (order.payment !== "cod" || order.status === "out_for_delivery" || order.status === "delivered") && <PaymentsBox base={base} order={order} busy={busy} onChange={load} />}
             </div>
           </section>
 
@@ -290,7 +287,7 @@ export default function OrderPage() {
               <>
                 {/* A delivered cash-on-delivery order is not finished until the cash is in: that is the main step until then. */}
                 <button className="btn quiet grow" style={cashDue ? { flex: "0 0 auto" } : undefined} disabled={busy} onClick={() => { if (confirm("Mark this order as returned?")) void move("returned").catch(() => undefined); }}>Mark returned</button>
-                {cashDue && <button className="btn grow" disabled={busy} onClick={() => run(async () => { await api(`${base}/payment/cash-handover`, { method: "POST" }); return "Cash received · order settled"; }).catch(() => undefined)}><Icon name="cash" size={18} />Got the cash</button>}
+                {cashDue && <button className="btn grow" disabled={busy} onClick={() => run(async () => { if (order.payment === "cod") await api(`${base}/payment/cash-handover`, { method: "POST" }); else await api(`${base}/payments`, { method: "POST", body: { amount: owing } }); return order.payment === "cod" ? "Cash received · order settled" : "Payment received · order settled"; }).catch(() => undefined)}><Icon name="cash" size={18} />{order.payment === "unpaid" ? "Got paid" : "Got the cash"}</button>}
               </>
             ) : null}
         </div>

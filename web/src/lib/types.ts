@@ -32,6 +32,10 @@ export type Order = {
   notes: string | null;
   stockApplied: boolean;
   paymentConfirmedAt: string | null;
+  /** What the shop expects to collect (the COD amount for COD, the total otherwise) and what has been paid so far. */
+  expected: number;
+  paid: number;
+  deliveredAt: string | null;
   externalRef: string | null;
   createdAt: string;
   items: OrderItem[];

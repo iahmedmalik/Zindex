@@ -94,6 +94,32 @@ export function reportsRouter(db: Db): Router {
     sendCsv(res, `zindex-sales-${from}-to-${to}.csv`, body);
   });
 
+  // Money received in a period, counted by the day each payment came in (not by the order's date): what a customer who
+  // pays in chunks, or a courier company that pays days later, has actually handed over. By method and by store.
+  router.get("/received", async (req, res) => {
+    const { from, to, storeId } = range(req);
+    const result = await asOwner(db, req.user!.id, async (tx) => {
+      const list = await rows<{ storeId: string; storeName: string; method: string; amount: number; payments: number }>(
+        tx,
+        sql`select s.id as store_id, s.name as store_name, coalesce(p.method, 'Not said') as method, sum(p.amount)::int as amount, count(*)::int as payments
+              from order_payments p
+              join orders o on o.id = p.order_id
+              join stores s on s.id = o.store_id
+             where p.received_on between ${from}::date and ${to}::date and (${storeId}::uuid is null or o.store_id = ${storeId}::uuid)
+             group by s.id, s.name, coalesce(p.method, 'Not said')
+             order by amount desc`,
+      );
+      const total = list.reduce((n, r) => n + r.amount, 0);
+      const group = (key: "method" | "storeName") => {
+        const m = new Map<string, number>();
+        for (const r of list) m.set(r[key], (m.get(r[key]) ?? 0) + r.amount);
+        return [...m].map(([name, amount]) => ({ name, amount })).sort((a, b) => b.amount - a.amount);
+      };
+      return { from, to, total, payments: list.reduce((n, r) => n + r.payments, 0), byMethod: group("method"), byStore: group("storeName") };
+    });
+    res.json(result);
+  });
+
   router.get("/inventory", async (req, res) => {
     const storeId = typeof req.query.storeId === "string" && req.query.storeId ? req.query.storeId : null;
     if (storeId && !uuid.test(storeId)) throw new HttpError(404, "Store not found.");

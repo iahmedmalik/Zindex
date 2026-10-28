@@ -242,6 +242,9 @@ textarea.input { min-height: 84px; resize: vertical; }
   .sheet .grab { display: none; }
 }
 
+/* A chip inside a white card would vanish into it: give it the second grey. */
+.paper .chip:not([aria-pressed="true"]), .well .chip:not([aria-pressed="true"]) { background: var(--paper-2); }
+
 /* Filter dropdowns (Picker.tsx): the store pill's look; the sheet is the same one, anchored under the pill on a laptop. */
 .pickers { display: flex; gap: 10px; }
 .pick { min-height: 44px; gap: 6px; flex: 1; justify-content: space-between; }
