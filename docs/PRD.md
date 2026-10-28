@@ -25,7 +25,7 @@ One owner login per account in v1. No staff roles. Open sign-up is deliberately 
 | Orders | One-page phone form: customer by phone (saved and reused), items from the catalogue or typed, percent discount, rider fee or courier fee, payment (paid in advance, cash on delivery, pay later), notes. Seven stages. A retried save never makes a second order. |
 | Invoices | Made with the order and numbered at once with the store's next gap-free number (a cancelled order keeps its number). Edits are logged once the order is out for delivery. A4 or compact receipt, print or PDF, image to share. |
 | Products and stock | A catalogue and price per store. In-house stock as an append-only ledger: one deduction when the order is confirmed, put back only when the owner approves, warnings at zero but sales never blocked. |
-| Delivery | Rider details and a ready-made text to paste into inDrive or Yango; a public delivery card link; manual courier parcel records with tracking and failure reasons. |
+| Delivery | Optional rider details (name, phone, bike, photo, tracking link); a public delivery card link; manual courier parcel records with tracking and failure reasons. |
 | Money | The owner marks advance payments received and COD cash handed over; a cash-with-riders summary. |
 | Messages | Seven editable WhatsApp templates per store and `wa.me` links. |
 | Insight | Dashboard of what needs action today; sales and stock reports with Excel files; complete backup download. |
@@ -54,4 +54,4 @@ One owner login per account in v1. No staff roles. Open sign-up is deliberately 
 
 ## Acceptance (from the owner's list, mapped to tests)
 
-See [TEST-REPORT.md](TEST-REPORT.md). Every acceptance line has an automated test except entry speed, which is timed by hand with the owner: stores do not mix, a WhatsApp order can be entered and invoiced, a Shopify import makes no duplicates, totals are correct, stock is not deducted before confirmation or twice, local details copy for inDrive or Yango, COD cash is tracked, courier parcels are saved, reports are produced, the app works on a 375 px phone, backups download, and a failed integration leaves the rest working.
+See [TEST-REPORT.md](TEST-REPORT.md). Every acceptance line has an automated test except entry speed, which is timed by hand with the owner: stores do not mix, a WhatsApp order can be entered and invoiced, a Shopify import makes no duplicates, totals are correct, stock is not deducted before confirmation or twice, optional rider details, COD cash is tracked, courier parcels are saved, reports are produced, the app works on a 375 px phone, backups download, and a failed integration leaves the rest working.

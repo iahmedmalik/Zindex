@@ -82,7 +82,7 @@ POST {{api}}/v1/stores/{{store}}/orders/{{order}}/restore-stock
 ### Invoice: made and numbered with the order (opening it is all it takes)
 GET {{api}}/v1/stores/{{store}}/orders/{{order}}/invoice
 
-### Local delivery: the text to paste into inDrive or Yango, and the rider's details
+### Local delivery: the rider's details (optional)
 GET {{api}}/v1/stores/{{store}}/orders/{{order}}/delivery
 
 ###

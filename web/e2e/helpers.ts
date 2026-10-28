@@ -41,3 +41,12 @@ export async function createOrder(page: Page, o: { name: string; phone?: string;
   await page.waitForURL(/\/orders\/[0-9a-f-]{36}\/[0-9a-f-]{36}$/);
   await expect(page.getByRole("heading", { name: /Receipt/ })).toBeVisible();
 }
+
+/** Opens the rider fields ("Add a rider") and fills them; the caller presses Save rider. */
+export async function addRider(page: Page, r: { name: string; bike?: string; phone?: string; tracking?: string }) {
+  await page.getByRole("button", { name: "Add a rider" }).click();
+  await page.getByLabel("Rider name").fill(r.name);
+  if (r.bike) await page.getByLabel("Bike number").fill(r.bike);
+  if (r.phone) await page.getByLabel("Rider phone").fill(r.phone);
+  if (r.tracking) await page.getByLabel("Tracking link").fill(r.tracking);
+}

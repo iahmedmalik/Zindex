@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Receipt } from "@/components/receipt";
 import { DoneButton, Icon, Journey, Seg, useToast } from "@/components/ui";
 import { api, messageOf } from "@/lib/api";
@@ -22,7 +22,7 @@ const next: Partial<Record<Stage, { to: Stage; label: string }>> = {
 const templates = [["order_confirmed", "Order confirmed"], ["invoice", "Invoice"], ["rider_assigned", "Rider assigned"], ["on_the_way", "On the way"], ["delivered", "Delivered"], ["payment_reminder", "Payment reminder"], ["thank_you", "Thank you"]] as const;
 const shipStatuses = [["shipped", "Shipped"], ["delayed", "Delayed"], ["delivered", "Delivered"], ["returned", "Returned"], ["failed", "Failed"]] as const;
 
-type DeliveryState = { delivery: Delivery | null; copyText: string };
+type DeliveryState = { delivery: Delivery | null };
 type Shipment = { courier: string; trackingNo: string | null; trackingUrl: string | null; shippedOn: string | null; status: string; failureReason: string | null };
 const wa = (phone: string | null) => (phone ? `https://wa.me/${phone.replace(/^0/, "92")}` : null);
 const orNull = (v: string) => (v.trim() ? v.trim() : null);
@@ -40,6 +40,9 @@ export default function OrderPage() {
   const [rider, setRider] = useState({ service: "yango", riderName: "", riderPhone: "", bikeNumber: "", trackingUrl: "" });
   const [parcel, setParcel] = useState({ courier: "", trackingNo: "", trackingUrl: "" });
   const [reason, setReason] = useState("");
+  const [adding, setAdding] = useState(false); // the rider fields are closed until "Add a rider" (or "Edit") is pressed
+  const addingRef = useRef(false);
+  useEffect(() => { addingRef.current = adding; }, [adding]);
   const [card, setCard] = useState<{ url: string | null } | null | undefined>(undefined);
   const cardUrl = card?.url ?? "";
   const [error, setError] = useState("");
@@ -55,7 +58,7 @@ export default function OrderPage() {
         const d = await api<DeliveryState>(`${base}/delivery`);
         setDel(d);
         const x = d.delivery;
-        if (x) setRider({ service: x.service ?? "yango", riderName: x.riderName ?? "", riderPhone: x.riderPhone ?? "", bikeNumber: x.bikeNumber ?? "", trackingUrl: x.trackingUrl ?? "" });
+        if (x && !addingRef.current) setRider({ service: x.service ?? "yango", riderName: x.riderName ?? "", riderPhone: x.riderPhone ?? "", bikeNumber: x.bikeNumber ?? "", trackingUrl: x.trackingUrl ?? "" });
       }
       if (o.deliveryKind === "courier") {
         const s = await api<{ shipment: Shipment | null }>(`${base}/shipment`);
@@ -116,9 +119,24 @@ export default function OrderPage() {
         <div className="stack" style={{ gap: 28 }}>
           {order.deliveryKind === "local" && !closed && del && (
             <section className="section">
-              <header><h2>Rider</h2>{del.delivery?.riderName ? <span className="badge ok">{del.delivery.riderName}{del.delivery.service ? ` · ${del.delivery.service === "indrive" ? "inDrive" : "Yango"}` : ""}</span> : <span className="badge">No rider added</span>}</header>
-              <div className="paper pre">{del.copyText}</div>
-              <DoneButton className="btn quiet" done="Copied" onClick={async () => { await copy(del.copyText); toast("Copied. Paste it into inDrive or Yango."); }}><Icon name="copy" size={18} />Copy for inDrive / Yango</DoneButton>
+              <header><h2>Rider</h2>{del.delivery?.riderName && <span className="badge ok">{del.delivery.riderName}{del.delivery.service ? ` · ${del.delivery.service === "indrive" ? "inDrive" : "Yango"}` : ""}</span>}</header>
+              {!adding && (
+                <div className="photo-row">
+                  <span className="photo-ic" aria-hidden="true"><Icon name="bike" size={22} /></span>
+                  {del.delivery?.riderName ? (
+                    <>
+                      <span className="grow"><b>{del.delivery.riderName}</b><br /><span className="note">{[del.delivery.service === "indrive" ? "inDrive" : del.delivery.service === "yango" ? "Yango" : null, del.delivery.bikeNumber, del.delivery.riderPhone].filter(Boolean).join(" · ")}</span></span>
+                      <button className="btn small quiet" aria-expanded={false} onClick={() => setAdding(true)}>Edit</button>
+                    </>
+                  ) : (
+                    <>
+                      <span className="grow"><b>No rider added</b><br /><span className="note">Optional. Add the rider so the customer sees who is coming.</span></span>
+                      <button className="btn small quiet" aria-expanded={false} onClick={() => setAdding(true)}><Icon name="plus" size={16} />Add a rider</button>
+                    </>
+                  )}
+                </div>
+              )}
+              <div className={`expand${adding ? " open" : ""}`}><div className="stack" style={{ gap: 14 }}>
               <Seg label="App" value={rider.service} onChange={(v) => setRider({ ...rider, service: v })} options={[["yango", "Yango"], ["indrive", "inDrive"]] as const} />
               <div className="grid2">
                 <label className="field"><span>Rider name</span><input className="input" value={rider.riderName} onChange={(e) => setRider({ ...rider, riderName: e.target.value })} /></label>
@@ -139,9 +157,14 @@ export default function OrderPage() {
                 {del.delivery?.hasPhoto && <button className="linkbtn" disabled={busy} onClick={() => run(async () => { await api(`${base}/delivery/photo`, { method: "DELETE" }); return "Rider photo removed"; }).catch(() => undefined)}>Remove</button>}
               </div>
               <label className="field"><span>Tracking link (paste from inDrive or Yango, optional)</span><input className="input" inputMode="url" value={rider.trackingUrl} onChange={(e) => setRider({ ...rider, trackingUrl: e.target.value })} placeholder="https://" /></label>
-              <DoneButton done="Rider saved" disabled={busy} onClick={() => run(async () => {
-                await api(`${base}/delivery`, { method: "PUT", body: { service: rider.service, riderName: orNull(rider.riderName), riderPhone: orNull(rider.riderPhone), bikeNumber: orNull(rider.bikeNumber), trackingUrl: orNull(rider.trackingUrl) } });
-              })}>Save rider</DoneButton>
+              <div className="inline">
+                <DoneButton done="Rider saved" disabled={busy} onClick={() => run(async () => {
+                  await api(`${base}/delivery`, { method: "PUT", body: { service: rider.service, riderName: orNull(rider.riderName), riderPhone: orNull(rider.riderPhone), bikeNumber: orNull(rider.bikeNumber), trackingUrl: orNull(rider.trackingUrl) } });
+                  setAdding(false);
+                })}>Save rider</DoneButton>
+                <button className="btn quiet" disabled={busy} onClick={() => { setAdding(false); void load(); }}>Cancel</button>
+              </div>
+              </div></div>
             </section>
           )}
 

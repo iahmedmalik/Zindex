@@ -139,7 +139,7 @@ paths:
     get: { tags: [Invoices], summary: "Search by number, customer or phone (?q=)", responses: { "200": { description: OK } } }
   /v1/stores/{storeId}/orders/{orderId}/delivery:
     parameters: [{ $ref: "#/components/parameters/storeId" }, { $ref: "#/components/parameters/orderId" }]
-    get: { tags: [Delivery], summary: The rider's details and the text to paste into inDrive or Yango, responses: { "200": { description: OK } } }
+    get: { tags: [Delivery], summary: The rider's details (none until the owner adds one), responses: { "200": { description: OK } } }
     put: { tags: [Delivery], summary: Save the rider by hand (only the fields sent change), responses: { "200": { description: OK }, "409": { description: Only local orders have a rider } } }
   /v1/stores/{storeId}/orders/{orderId}/shipment:
     parameters: [{ $ref: "#/components/parameters/storeId" }, { $ref: "#/components/parameters/orderId" }]

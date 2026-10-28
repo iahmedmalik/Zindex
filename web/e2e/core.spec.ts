@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { DEMO, createOrder, freshPhone, signIn } from "./helpers";
+import { DEMO, addRider, createOrder, freshPhone, signIn } from "./helpers";
 
 test.describe("sign-in", () => {
   test("@smoke refuses a wrong password and lets the owner in with the right one", async ({ page }) => {
@@ -35,7 +35,7 @@ test.describe("an order from WhatsApp to the door", () => {
     await expect(page.getByText("At the door 2,150 · store 1,800 + rider 350")).toBeVisible();
     await page.getByRole("button", { name: "Create order" }).click();
     await page.waitForURL(/\/orders\/[0-9a-f-]{36}\/[0-9a-f-]{36}$/);
-    await expect(page.getByText("PKR 1,800").first()).toBeVisible();
+    await expect(page.getByRole("group", { name: /Receipt for order/ })).toContainText("1,800"); // the receipt, not the closed rider section
     await expect(page.getByText(/hands the rider/)).toContainText("PKR 2,150");
     await expect(page.getByText(/brings 1,800 back to you/)).toBeVisible();
   });
@@ -69,9 +69,7 @@ test.describe("an order from WhatsApp to the door", () => {
 
   test("@smoke the customer's delivery card needs no sign-in, shows the rider and what to pay, and a bad link says so", async ({ page, browser }) => {
     await createOrder(page, { name: "Card Buyer", rider: "350" });
-    await page.getByLabel("Rider name").fill("Imran");
-    await page.getByLabel("Bike number").fill("LEA-1234");
-    await page.getByLabel("Rider phone").fill("0345 5551212");
+    await addRider(page, { name: "Imran", bike: "LEA-1234", phone: "0345 5551212" });
     await page.getByRole("button", { name: "Save rider" }).click();
     await expect(page.getByText("Imran · Yango")).toBeVisible();
     await page.getByRole("button", { name: "Confirm order", exact: true }).click(); // the card link is made by itself on confirm

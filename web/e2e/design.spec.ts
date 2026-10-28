@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { createOrder, signIn } from "./helpers";
+import { addRider, createOrder, signIn } from "./helpers";
 
 // The approved redesign: the store switcher lives on Today only, the whole app follows the pick,
 // and the rider photo, tracking link and store contact details reach the customer's card.
@@ -44,10 +44,10 @@ test.describe("receipt and delivery card", () => {
 
   test("@smoke a rider photo and a tracking link show on the customer's card, with a Track button; removing the photo takes it off", async ({ page, browser }) => {
     await createOrder(page, { name: "Photo Buyer", rider: "300" });
-    await page.getByLabel("Rider name").fill("Bilal");
-    await page.getByLabel("Tracking link").fill("https://indrive.example/trip/abc123");
+    await addRider(page, { name: "Bilal", tracking: "https://indrive.example/trip/abc123" });
     await page.getByRole("button", { name: "Save rider" }).click();
     await expect(page.getByText("Bilal · Yango")).toBeVisible();
+    await page.getByRole("button", { name: "Edit" }).click(); // the fields close after saving; Edit opens them again for the photo
     // a real picture, drawn in the page, handed to the file input as a camera or gallery pick would
     const b64 = await page.evaluate(() => {
       const c = document.createElement("canvas"); c.width = 800; c.height = 600;
@@ -104,9 +104,12 @@ test.describe("receipt and delivery card", () => {
 
   test("saving a rider does not add a second status: only the main button moves the order", async ({ page }) => {
     await createOrder(page, { name: "One Button", rider: "300" });
-    await page.getByLabel("Rider name").fill("Imran");
+    await expect(page.getByLabel("Rider name")).toBeHidden(); // the order page stays simple until a rider is added
+    await expect(page.getByRole("button", { name: "Add a rider" })).toBeVisible();
+    await addRider(page, { name: "Imran" });
     await page.getByRole("button", { name: "Save rider" }).click();
     await expect(page.getByText("Imran · Yango")).toBeVisible();
+    await expect(page.getByLabel("Rider name")).toBeHidden(); // closed again after saving
     await expect(page.getByRole("button", { name: /Mark (booked|picked up)/ })).toHaveCount(0);
     await expect(page.getByText(/^Ride:/)).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Confirm order", exact: true })).toBeVisible();
@@ -114,8 +117,7 @@ test.describe("receipt and delivery card", () => {
 
   test("a tracking link that is not https is refused with a clear message", async ({ page }) => {
     await createOrder(page, { name: "Bad Link Buyer", rider: "300" });
-    await page.getByLabel("Rider name").fill("Imran");
-    await page.getByLabel("Tracking link").fill("http://indrive.example/trip/1");
+    await addRider(page, { name: "Imran", tracking: "http://indrive.example/trip/1" });
     await page.getByRole("button", { name: "Save rider" }).click();
     await expect(page.getByText(/https/).first()).toBeVisible();
   });

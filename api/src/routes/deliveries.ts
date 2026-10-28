@@ -52,25 +52,6 @@ export type Delivery = {
 
 const cols = sql`id, order_id, service, rider_name, rider_phone, bike_number, rider_photo_url, rider_photo_taken_at, tracking_url, rider_screenshot_url, pickup_address, notes, cash_handed_over, cash_handed_at, exists (select 1 from delivery_photos p where p.delivery_id = deliveries.id) as has_photo`;
 
-const maps = (address: string) => `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
-const pkr = (n: number) => `PKR ${n.toLocaleString("en-US")}`;
-
-/** The text the owner pastes into inDrive or Yango (or sends to the rider). */
-export function copyText(o: Order, store: { name: string; address: string | null; phone: string | null }, notes: string | null): string {
-  const lines = [
-    `${store.name} · Order #${o.orderNo}`,
-    store.address ? `Pickup: ${store.address}\n${maps(store.address)}` : null,
-    `Deliver to: ${o.customerName}${o.customerPhone ? ` · ${o.customerPhone}` : ""}`,
-    o.address ? `Address: ${o.address}\n${maps(o.address)}` : null,
-    `Parcel: ${o.items.map((i) => `${i.quantity} x ${i.name}`).join(", ")}`,
-    o.collectAtDoor > 0
-      ? `Customer pays the rider: ${pkr(o.collectAtDoor)}${o.codAmount > 0 ? ` (goods ${pkr(o.codAmount)} for the store + rider fee ${pkr(o.riderFee)})` : ` (rider fee only; goods already paid)`}`
-      : "Nothing to collect from the customer.",
-    notes ?? o.notes ? `Note: ${notes ?? o.notes}` : null,
-  ];
-  return lines.filter(Boolean).join("\n");
-}
-
 async function loadDelivery(tx: Tx, orderId: string) {
   const [delivery] = await rows<Delivery>(tx, sql`select ${cols} from deliveries where order_id = ${orderId}`);
   return { delivery: delivery ?? null };
@@ -92,11 +73,7 @@ export function deliveriesRouter(db: Db): Router {
   };
 
   router.get("/", async (req, res) => {
-    const result = await withOrder(req, async (tx, o, storeId, orderId) => {
-      const [store] = await rows<{ name: string; address: string | null; phone: string | null }>(tx, sql`select name, address, phone from stores where id = ${storeId}`);
-      const found = await loadDelivery(tx, orderId);
-      return { ...found, copyText: copyText(o, store!, found.delivery?.notes ?? null) };
-    });
+    const result = await withOrder(req, (tx, _o, _storeId, orderId) => loadDelivery(tx, orderId));
     res.json(result);
   });
 

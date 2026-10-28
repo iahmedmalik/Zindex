@@ -20,26 +20,15 @@ const api = (cookie: string) => {
 };
 
 describe("local delivery", () => {
-  it("gives the owner a text to paste into inDrive or Yango, with the cash split spelled out", async () => {
+  it("has no rider until one is saved, and offers no ready-made text for inDrive or Yango", async () => {
     const o = await newVerifiedOwner(t.app, t.mailer);
     const a = api(o.cookie);
     const store = await a.store();
     const order = await a.order(store);
     const got = await a.get(store, order);
+    expect(got.status).toBe(200);
     expect(got.body.delivery).toBeNull();
-    expect(got.body.copyText).toContain("Order #1");
-    expect(got.body.copyText).toContain("Pickup: Shop 3, Main Market, Lahore");
-    expect(got.body.copyText).toContain("https://www.google.com/maps/search/?api=1&query=House%204%2C%20Model%20Town");
-    expect(got.body.copyText).toContain("2 x Garam masala");
-    expect(got.body.copyText).toContain("Customer pays the rider: PKR 1,250 (goods PKR 900 for the store + rider fee PKR 350)");
-  });
-
-  it("says only the rider fee is collected when the goods were paid in advance", async () => {
-    const o = await newVerifiedOwner(t.app, t.mailer);
-    const a = api(o.cookie);
-    const store = await a.store();
-    const order = await a.order(store, { payment: "paid", paymentMethod: "easypaisa" });
-    expect((await a.get(store, order)).body.copyText).toContain("Customer pays the rider: PKR 350 (rider fee only; goods already paid)");
+    expect(got.body).not.toHaveProperty("copyText");
   });
 
   it("records the rider by hand, and saving it changes only the rider's details", async () => {

@@ -22,7 +22,7 @@ On a laptop the same app has a side menu and a second column, and the invoice co
 - **Several stores, one login.** Each store has its own invoice numbers, prices, stock, customers, WhatsApp number and colour. Nothing mixes.
 - **Invoices that look like the shop.** Made with the order, with the store's next gap-free number (`SF-0007`); a cancelled order keeps its number. Changes are logged once the order is out for delivery. The paper wears the store's own colour, shows the exact amount to have ready for the rider, and comes as A4 or a compact receipt: **Save to gallery** (the phone's share sheet), send on WhatsApp, or download a PDF.
 - **Stock you can trust.** An append-only ledger. Stock leaves once, when you confirm an order; goes back only when you approve; warns at zero but never blocks a sale.
-- **Riders without the copy-paste.** One tap copies the pickup, address, map links, parcel and amount for inDrive or Yango. The rider's fee is kept apart from the shop's money, so cash adds up.
+- **Riders on your terms.** A rider is optional: add one only when you want the customer to see who is coming. The rider's fee is kept apart from the shop's money, so cash adds up.
 - **The delivery card.** A link for the customer: status, rider name, bike number, a call button, and the exact amount to have ready. In the store's own colour. It expires and can be switched off; only a hash of the link is stored.
 - **Cash on delivery tracking.** Mark advance payments received and COD cash handed over; see what is still with riders.
 - **WhatsApp, free.** Seven editable message templates per store and `wa.me` links. No Business API.
