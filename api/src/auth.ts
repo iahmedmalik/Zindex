@@ -57,6 +57,9 @@ export function createAuth(db: Db, config: AuthConfig, mailer: Mailer, options: 
     },
     emailVerification: {
       sendOnSignUp: true,
+      // Signing up again with a known address sends nothing (so nobody can probe who has an account), so the
+      // way to get a new link is to try to sign in: an unconfirmed address is sent a fresh one.
+      sendOnSignIn: true,
       autoSignInAfterVerification: true,
       expiresIn: 60 * 60 * 24,
       sendVerificationEmail: async ({ user, url }) => {

@@ -39,6 +39,24 @@ describe("sign-up needs a verified email", () => {
     expect(me.body.user.email).toBe(address);
   });
 
+  it("sends a fresh confirmation link when someone signs in before confirming, and none once confirmed", async () => {
+    const address = email();
+    await post(t.app, "/v1/auth/sign-up/email", { name: "Zara", email: address, password: PASSWORD });
+    const confirmations = () => t.mailer.sent.filter((m) => m.to === address && m.subject.includes("Confirm")).length;
+    expect(confirmations()).toBe(1);
+
+    const early = await post(t.app, "/v1/auth/sign-in/email", { email: address, password: PASSWORD });
+    expect(early.status).toBe(403);
+    expect(early.body.message).toMatch(/not verified/i); // the sign-in page looks for this wording
+    expect(confirmations()).toBe(2);
+
+    const link = new URL(linkFor(t.mailer, address));
+    await request(t.app).get(link.pathname + link.search);
+    const login = await post(t.app, "/v1/auth/sign-in/email", { email: address, password: PASSWORD });
+    expect(login.status).toBe(200);
+    expect(confirmations()).toBe(2);
+  });
+
   it("answers /v1/me with 401 and a plain message when nobody is signed in", async () => {
     const res = await request(t.app).get("/v1/me");
     expect(res.status).toBe(401);
