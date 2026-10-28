@@ -4,7 +4,17 @@
 
 Zindex turns a chat order into an invoice in about a minute, keeps stock honest, and sends the customer a link that shows their rider and exactly what to hand over at the door. It is built phone first, for an owner who runs a few shops from a phone, and it works the same on a laptop.
 
-<!-- Screenshots and the live address are added at release. -->
+<p align="center">
+  <img src="docs/screenshots/today-phone.png" alt="Today on a phone: sales, the delivery van and what needs the owner now" width="230">
+  <img src="docs/screenshots/order-phone.png" alt="An order on a phone: the journey line, the rider text to copy and the next step" width="230">
+  <img src="docs/screenshots/invoice-phone.png" alt="The invoice in the store's own colour, with the amount to have ready for the rider" width="230">
+</p>
+
+On a laptop the same app has a side menu and a second column, and the invoice comes as a full A4 sheet:
+
+![The invoice as an A4 sheet](docs/screenshots/invoice-a4.png)
+
+*All screenshots are of the built-in demo, with made-up shops, customers and orders. The live address is added at release.*
 
 ## What it does
 
