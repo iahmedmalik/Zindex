@@ -6,7 +6,8 @@ services:
     runtime: node
     region: singapore # next to the Neon database
     plan: free
-    buildCommand: npm ci && npm run build -w @zindex/api
+    # NODE_ENV=production would make `npm ci` skip dev dependencies, and the build tool (tsup) is one of them.
+    buildCommand: npm ci --include=dev && npm run build -w @zindex/api
     startCommand: npm run start -w @zindex/api
     healthCheckPath: /health
     envVars:
