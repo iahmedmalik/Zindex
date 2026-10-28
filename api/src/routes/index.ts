@@ -32,7 +32,7 @@ export function createRoutes(ctx: AppContext): Router {
   router.use("/reports", reportsRouter(ctx.db));
   router.use("/stores/:storeId/products", productsRouter(ctx.db));
   router.use("/stores/:storeId/customers", customersRouter(ctx.db));
-  router.use("/stores/:storeId/orders", ordersRouter(ctx.db));
+  router.use("/stores/:storeId/orders", ordersRouter(ctx.db, ctx.config));
   router.use("/stores/:storeId/orders/:orderId/invoice", orderInvoiceRouter(ctx.db));
   router.use("/stores/:storeId/orders/:orderId/delivery", deliveriesRouter(ctx.db));
   router.use("/stores/:storeId/orders/:orderId/card", cardsRouter(ctx.db, ctx.config));

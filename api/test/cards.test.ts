@@ -14,10 +14,62 @@ const api = (cookie: string) => {
     rider: (s: string, o: string) => call("put", `/v1/stores/${s}/orders/${o}/delivery`, { service: "yango", riderName: "Imran", riderPhone: "03217654321", bikeNumber: "LEA-1234" }),
     make: (s: string, o: string, body: object = {}) => call("post", `/v1/stores/${s}/orders/${o}/card`, body),
     revoke: (s: string, o: string) => call("delete", `/v1/stores/${s}/orders/${o}/card`),
+    current: (s: string, o: string) => call("get", `/v1/stores/${s}/orders/${o}/card`),
+    status: (s: string, o: string, status: string) => call("post", `/v1/stores/${s}/orders/${o}/status`, { status }),
   };
 };
 
 const open = (token: string) => request(t.app).get(`/v1/public/card/${token}`);
+
+const tokenOf = (url: string) => url.split("/c/")[1]!;
+
+describe("delivery card, made automatically", () => {
+  it("makes the link when the order is confirmed, and shows the same link on every later visit", async () => {
+    const o = await newVerifiedOwner(t.app, t.mailer);
+    const a = api(o.cookie);
+    const store = await a.store();
+    const order = await a.order(store);
+    expect((await a.current(store, order)).body.card).toBeNull(); // nothing yet: it is made on confirm
+
+    await a.status(store, order, "confirmed");
+    const first = (await a.current(store, order)).body.card;
+    expect(first.url).toMatch(/^http:\/\/localhost:3000\/c\/[A-Za-z0-9_-]{32}$/);
+    expect(new Date(first.expiresAt).getTime()).toBeGreaterThan(Date.now() + 6 * 86_400_000);
+    expect((await open(tokenOf(first.url))).status).toBe(200); // no rider saved, and it still works
+
+    await a.status(store, order, "packed");
+    expect((await a.current(store, order)).body.card.url).toBe(first.url); // not remade by later steps
+  });
+
+  it("replaces the automatic link when the owner makes a new one, and the old link stops working", async () => {
+    const o = await newVerifiedOwner(t.app, t.mailer);
+    const a = api(o.cookie);
+    const store = await a.store();
+    const order = await a.order(store);
+    await a.status(store, order, "confirmed");
+    const old = (await a.current(store, order)).body.card.url as string;
+
+    const fresh = (await a.make(store, order)).body;
+    expect(fresh.url).not.toBe(old);
+    expect((await a.current(store, order)).body.card.url).toBe(fresh.url);
+    expect((await open(tokenOf(old))).status).toBe(404);
+    expect((await open(tokenOf(fresh.url))).status).toBe(200);
+  });
+
+  it("makes no link for an order that is cancelled, and none for another owner's order", async () => {
+    const o = await newVerifiedOwner(t.app, t.mailer);
+    const a = api(o.cookie);
+    const store = await a.store();
+    const order = await a.order(store);
+    await a.status(store, order, "cancelled");
+    expect((await a.current(store, order)).body.card).toBeNull();
+
+    const other = await newVerifiedOwner(t.app, t.mailer);
+    const confirmed = await a.order(store);
+    await a.status(store, confirmed, "confirmed");
+    expect((await api(other.cookie).current(store, confirmed)).status).toBe(404);
+  });
+});
 
 describe("delivery card", () => {
   it("opens for the customer with no sign-in and shows exactly what the card needs", async () => {

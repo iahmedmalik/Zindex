@@ -1,4 +1,3 @@
-import { createHash, randomBytes } from "node:crypto";
 import { sql } from "drizzle-orm";
 import { Router } from "express";
 import { rateLimit } from "express-rate-limit";
@@ -6,38 +5,41 @@ import { z } from "zod";
 import type { Config } from "../config";
 import { asOwner, type Db } from "../db/client";
 import { rows } from "../db/query";
+import { hashOf, liveCard, makeCard } from "../cards/token";
 import { HttpError } from "../http-error";
 import { validateBody } from "../validate";
 import { idParam, storeIdOf } from "./ids";
 import { loadOrder } from "./orders";
 
-const hashOf = (token: string) => createHash("sha256").update(token).digest("hex");
 const createBody = z.object({ days: z.number().int().min(1).max(30).optional() }).strict();
 
 // Mounted at /v1/stores/:storeId/orders/:orderId/card (owner side)
 export function cardsRouter(db: Db, config: Config): Router {
   const router = Router({ mergeParams: true });
 
-  // Makes a fresh link and switches off any earlier one for this order. The token is shown once;
-  // only its hash is stored.
+  // The order's live link, so the page can show and copy it on any visit. It is made when the order is confirmed.
+  // card is null when there is none yet; url is null for an old random link that cannot be shown again.
+  router.get("/", async (req, res) => {
+    const card = await asOwner(db, req.user!.id, async (tx) => {
+      const order = await loadOrder(tx, storeIdOf(req), idParam(req, "orderId", "Order"));
+      if (!order) throw new HttpError(404, "Order not found.");
+      return liveCard(tx, config.BETTER_AUTH_SECRET, config.WEB_ORIGIN, order.id);
+    });
+    res.json({ card });
+  });
+
+  // Makes a fresh link and switches off any earlier one for this order ("Make a new link").
   router.post("/", validateBody(createBody), async (req, res) => {
     const days = (req.body as z.infer<typeof createBody>).days ?? 7;
     const storeId = storeIdOf(req);
     const orderId = idParam(req, "orderId", "Order");
-    const token = randomBytes(24).toString("base64url");
     const card = await asOwner(db, req.user!.id, async (tx) => {
       const order = await loadOrder(tx, storeId, orderId);
       if (!order) throw new HttpError(404, "Order not found.");
       if (order.status === "cancelled") throw new HttpError(409, "A cancelled order has no delivery card.");
-      await tx.execute(sql`update delivery_cards set revoked_at = now() where order_id = ${orderId} and revoked_at is null`);
-      const [row] = await rows<{ expiresAt: Date }>(
-        tx,
-        sql`insert into delivery_cards (order_id, token_hash, expires_at)
-            values (${orderId}, ${hashOf(token)}, now() + make_interval(days => ${days})) returning expires_at`,
-      );
-      return row!;
+      return makeCard(tx, config.BETTER_AUTH_SECRET, config.WEB_ORIGIN, orderId, days);
     });
-    res.status(201).json({ token, url: `${config.WEB_ORIGIN}/c/${token}`, expiresAt: card.expiresAt });
+    res.status(201).json(card);
   });
 
   router.delete("/", async (req, res) => {

@@ -40,7 +40,8 @@ export default function OrderPage() {
   const [rider, setRider] = useState({ service: "yango", riderName: "", riderPhone: "", bikeNumber: "", trackingUrl: "" });
   const [parcel, setParcel] = useState({ courier: "", trackingNo: "", trackingUrl: "" });
   const [reason, setReason] = useState("");
-  const [cardUrl, setCardUrl] = useState("");
+  const [card, setCard] = useState<{ url: string | null } | null | undefined>(undefined);
+  const cardUrl = card?.url ?? "";
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -49,6 +50,7 @@ export default function OrderPage() {
       const { order: o } = await api<{ order: Order }>(base);
       setOrder(o);
       api<{ invoice: Invoice }>(`${base}/invoice`).then((r) => setInvoice(r.invoice)).catch(() => setInvoice(null));
+      api<{ card: { url: string | null } | null }>(`${base}/card`).then((r) => setCard(r.card)).catch(() => setCard(null));
       if (o.deliveryKind === "local") {
         const d = await api<DeliveryState>(`${base}/delivery`);
         setDel(d);
@@ -179,14 +181,19 @@ export default function OrderPage() {
           {!closed && (
             <section className="section">
               <header><h2>Tell {order.customerName.split(" ")[0]}</h2></header>
-              {cardUrl ? (
+              {card === undefined ? <div className="skel"><span /></div> : cardUrl ? (
                 <div className="inline" style={{ padding: "12px 14px", border: "1px solid var(--line)", borderRadius: "var(--r-md)", background: "var(--surface)", flexWrap: "nowrap" }}>
                   <span style={{ color: "var(--store)" }}><Icon name="link" size={18} /></span>
                   <code style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", font: "500 var(--t-sm) var(--font)", color: "var(--ink-2)" }}>{cardUrl.replace(/^https?:\/\//, "")}</code>
                   <DoneButton className="btn small quiet" done="" onClick={async () => { await copy(cardUrl); toast("Delivery card link copied"); }}>Copy</DoneButton>
                 </div>
+              ) : order.status === "pending" ? (
+                <p className="note">The customer&apos;s delivery card link is made as soon as you confirm the order.</p>
               ) : (
-                <button className="btn quiet" disabled={busy} onClick={() => run(async () => { const r = await api<{ url: string }>(`${base}/card`, { method: "POST", body: {} }); setCardUrl(r.url); return "Delivery card link made · works for 7 days"; })}><Icon name="link" size={18} />Make delivery card link</button>
+                <button className="btn quiet" disabled={busy} onClick={() => run(async () => { await api(`${base}/card`, { method: "POST", body: {} }); return "Delivery card link made · works for 7 days"; })}><Icon name="link" size={18} />{card ? "Make a new delivery card link" : "Make delivery card link"}</button>
+              )}
+              {cardUrl && (
+                <button className="linkbtn" style={{ justifySelf: "start" }} disabled={busy} onClick={() => { if (confirm("Make a new link? The old one will stop working.")) void run(async () => { await api(`${base}/card`, { method: "POST", body: {} }); return "New delivery card link made · the old one is off"; }).catch(() => undefined); }}>Make a new link</button>
               )}
               <div className="chips">
                 {templates.map(([key, label]) => (
@@ -198,7 +205,7 @@ export default function OrderPage() {
                   }}><span style={{ color: "var(--ok)" }}><Icon name="chat" size={16} /></span>{label}</button>
                 ))}
               </div>
-              <p className="note">{order.customerPhone ? "Opens WhatsApp with the message ready to send. Make the card link first for messages that include it." : "Add a phone number to the order to message the customer."}</p>
+              <p className="note">{order.customerPhone ? "Opens WhatsApp with the message ready to send." : "Add a phone number to the order to message the customer."}</p>
             </section>
           )}
         </div>

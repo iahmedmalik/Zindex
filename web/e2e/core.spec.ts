@@ -74,7 +74,8 @@ test.describe("an order from WhatsApp to the door", () => {
     await page.getByLabel("Rider phone").fill("0345 5551212");
     await page.getByRole("button", { name: "Save rider" }).click();
     await expect(page.getByText("Imran · Yango")).toBeVisible();
-    await page.getByRole("button", { name: "Make delivery card link" }).click();
+    await page.getByRole("button", { name: "Confirm order", exact: true }).click(); // the card link is made by itself on confirm
+    await expect(page.locator("code").first()).toBeVisible();
     const link = await page.locator("code").first().innerText();
     const path = new URL(`http://${link}`).pathname;
 

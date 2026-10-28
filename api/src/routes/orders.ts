@@ -1,6 +1,8 @@
 import { sql } from "drizzle-orm";
 import { Router } from "express";
 import { z } from "zod";
+import { ensureCard } from "../cards/token";
+import type { Config } from "../config";
 import { asOwner, type Db, type Tx } from "../db/client";
 import { pgCode, rows, textArray } from "../db/query";
 import { HttpError } from "../http-error";
@@ -192,7 +194,7 @@ export async function insertOrder(tx: Tx, storeId: string, b: NewOrder, key: str
 }
 
 // Mounted at /v1/stores/:storeId/orders
-export function ordersRouter(db: Db): Router {
+export function ordersRouter(db: Db, config: Config): Router {
   const router = Router({ mergeParams: true });
 
   router.get("/", async (req, res) => {
@@ -322,6 +324,8 @@ export function ordersRouter(db: Db): Router {
       // Confirming is the one moment stock moves. A zero-stock sale still goes through; the
       // warning tells the owner which products are now below zero.
       const stockWarnings: StockWarning[] = status === "confirmed" ? await deductForOrder(tx, storeId, id) : [];
+      // The customer's delivery card link is made by itself at this moment; the owner only has to send it.
+      if (status === "confirmed") await ensureCard(tx, config.BETTER_AUTH_SECRET, config.WEB_ORIGIN, id);
       return { order: await loadOrder(tx, storeId, id), stockWarnings };
     });
     res.json(order);

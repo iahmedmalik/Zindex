@@ -56,7 +56,8 @@ test.describe("receipt and delivery card", () => {
     });
     await page.locator('input[type="file"]').setInputFiles({ name: "rider.png", mimeType: "image/png", buffer: Buffer.from(b64, "base64") });
     await expect(page.getByText("Rider photo saved")).toBeVisible();
-    await page.getByRole("button", { name: "Make delivery card link" }).click();
+    await page.getByRole("button", { name: "Confirm order", exact: true }).click(); // the card link is made by itself on confirm
+    await expect(page.locator("code").first()).toBeVisible();
     const path = new URL(`http://${await page.locator("code").first().innerText()}`).pathname;
 
     const customer = await browser.newContext({ viewport: page.viewportSize() ?? undefined });
@@ -83,14 +84,16 @@ test.describe("receipt and delivery card", () => {
 
   test("@smoke the customer's card follows the main button alone, with no rider saved, and there is no second status button", async ({ page, browser }) => {
     await createOrder(page, { name: "Card Follower", rider: "300" });
-    await page.getByRole("button", { name: "Make delivery card link" }).click();
+    await expect(page.getByText(/made as soon as you confirm/)).toBeVisible(); // nothing to copy until the order is confirmed
+    await page.getByRole("button", { name: "Confirm order", exact: true }).click();
+    await expect(page.locator("code").first()).toBeVisible(); // made by itself, no button to press
     const path = new URL(`http://${await page.locator("code").first().innerText()}`).pathname;
     const customer = await browser.newContext({ viewport: page.viewportSize() ?? undefined });
     const card = await customer.newPage();
     await card.goto(path);
-    await expect(card.getByRole("heading", { level: 1 })).toHaveText("We got your order");
+    await expect(card.getByRole("heading", { level: 1 })).toHaveText("Your order is confirmed");
 
-    for (const [button, said, headline] of [["Confirm order", "confirmed", "Your order is confirmed"], ["Mark packed", "packed", "Your order is packed"], ["Out for delivery", "out for delivery", "On its way to you"], ["Mark delivered", "delivered", "Delivered. Enjoy!"]] as const) {
+    for (const [button, said, headline] of [["Mark packed", "packed", "Your order is packed"], ["Out for delivery", "out for delivery", "On its way to you"], ["Mark delivered", "delivered", "Delivered. Enjoy!"]] as const) {
       await page.getByRole("button", { name: button, exact: true }).click();
       await expect(page.getByText(new RegExp(String.raw`#\d+ is ` + said))).toBeVisible(); // this step's own message, not the last one's
       await card.reload();
