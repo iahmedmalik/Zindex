@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { Picker } from "@/components/Picker";
 import { Icon } from "@/components/ui";
 import { api, messageOf } from "@/lib/api";
 import { pkr, stageLabel, when } from "@/lib/format";
@@ -9,7 +10,8 @@ import { useSession } from "@/lib/session";
 import type { Order, Stage } from "@/lib/types";
 
 const filters: (Stage | "")[] = ["", "pending", "confirmed", "packed", "out_for_delivery", "delivered", "returned", "cancelled"];
-const pays = [["", "Any payment"], ["cod", "COD"], ["paid", "Paid"], ["unpaid", "Pay later"]] as const;
+const stageOptions = filters.map((f) => ({ value: f, label: f ? stageLabel[f] : "All" }));
+const payOptions = [{ value: "", label: "Any" }, { value: "cod", label: "COD" }, { value: "paid", label: "Paid" }, { value: "unpaid", label: "Pay later" }];
 
 // Every order for the chosen store (or all stores), searchable by customer, phone or #number.
 export default function OrdersPage() {
@@ -56,13 +58,9 @@ export default function OrdersPage() {
           <span style={{ position: "absolute", left: 12, top: 13, color: "var(--ink-2)" }}><Icon name="search" /></span>
           <input className="input" type="search" placeholder="Name, phone or #number" value={q} onChange={(e) => setQ(e.target.value)} style={{ paddingLeft: 42 }} />
         </label>
-        <div className="chips" role="group" aria-label="Stage">
-          {filters.map((f) => (
-            <button key={f || "all"} className="chip" aria-pressed={status === f} onClick={() => setStatus(f)}>{f ? stageLabel[f] : "All"}</button>
-          ))}
-        </div>
-        <div className="chips" role="group" aria-label="Payment">
-          {pays.map(([v, label]) => <button key={label} className="chip" aria-pressed={payment === v} onClick={() => setPayment(v)}>{label}</button>)}
+        <div className="pickers">
+          <Picker label="Stage" value={status} options={stageOptions} onChange={setStatus} />
+          <Picker label="Payment" value={payment} options={payOptions} onChange={setPayment} />
         </div>
       </div>
       {error && <p className="error" role="alert">{error}</p>}

@@ -239,6 +239,19 @@ textarea.input { min-height: 84px; resize: vertical; }
   .sheet .grab { display: none; }
 }
 
+/* Filter dropdowns (Picker.tsx): the store pill's look; the sheet is the same one, anchored under the pill on a laptop. */
+.pickers { display: flex; gap: 10px; }
+.pick { min-height: 44px; gap: 6px; flex: 1; justify-content: space-between; }
+.pick .pick-l { color: var(--ink-2); font-weight: 500; margin-right: -2px; }
+.pick > span:nth-child(2) { flex: 1; text-align: left; }
+.pick.on { background: var(--brand); color: var(--brand-ink); }
+.pick.on .pick-l { color: inherit; opacity: 0.8; }
+@media (min-width: 900px) {
+  .pick { flex: none; }
+  .pick > span:nth-child(2) { flex: none; }
+  .sheet.anchored { left: var(--px, 0); right: auto; top: var(--py, 56px); width: 260px; }
+}
+
 /* toast: confirms an action, leaves on its own */
 .toast { position: fixed; z-index: 50; left: 50%; bottom: calc(92px + env(safe-area-inset-bottom)); transform: translate(-50%, var(--travel)); opacity: 0; pointer-events: none; padding: 12px 18px; border-radius: 999px; background: var(--ink); color: var(--paper); font-size: var(--t-sm); font-weight: 600; box-shadow: var(--shadow-pop); transition: opacity var(--t-exit) var(--ease-out), transform var(--t-exit) var(--ease-out); white-space: nowrap; }
 .toast.show { opacity: 1; transform: translate(-50%, 0); transition: opacity var(--t-base) var(--ease), transform var(--t-base) var(--ease); }
