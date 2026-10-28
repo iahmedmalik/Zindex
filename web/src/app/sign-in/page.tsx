@@ -49,7 +49,8 @@ export default function SignInPage() {
         router.replace(next && next.startsWith("/") && !next.startsWith("//") ? next : "/");
       }
     } catch (err) {
-      setError(messageOf(err));
+      const text = messageOf(err);
+      setError(mode === "in" && /not verified/i.test(text) ? `Your email isn't confirmed yet. We sent a new link to ${email}. Open it, then sign in.` : text);
     } finally {
       setBusy(false);
     }
@@ -67,7 +68,7 @@ export default function SignInPage() {
         {sent ? (
           <div className="well arrive">
             <h2>Check your email</h2>
-            <p>{sent === "verify" ? `We sent a link to ${email}. Open it to confirm your address, then sign in.` : `If ${email} has an account, a reset link is on its way. It works for one hour.`}</p>
+            <p>{sent === "verify" ? `We sent a link to ${email}. Open it to confirm your address, then sign in. No email? If you signed up before, sign in with this address and we will send a new link.` : `If ${email} has an account, a reset link is on its way. It works for one hour.`}</p>
             <button className="btn quiet" onClick={() => { setSent(""); setMode("in"); }}>Back to sign in</button>
           </div>
         ) : (
