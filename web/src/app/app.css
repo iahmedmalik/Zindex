@@ -111,10 +111,10 @@
 .ivp .iv-foot { margin: 14px 0 0; padding: 14px 4px 30px; border-top: 1.5px dashed #cdbfae; text-align: center; font-size: 12.5px; color: var(--pmute); display: grid; gap: 2px; }
 .ivp .iv-foot b { font: 600 14.5px var(--font-display); color: var(--pink); }
 .ivp .iv-torn { display: block; width: 100%; height: 10px; margin-top: -1px; }
-.ivp.compact { max-width: 360px; border-radius: 18px 18px 0 0; overflow: visible; background: transparent; }
-.ivp.compact .iv-hero { border-radius: 18px 18px 0 0; }
+.ivp.compact { max-width: 360px; border-radius: 0; overflow: visible; background: transparent; }
+.ivp.compact .iv-hero { border-radius: 0; } /* square: a rounded corner left white triangles in the saved picture */
 .ivp.compact .iv-sheet { box-shadow: none; padding-bottom: 6px; }
-.ivp.a4 { max-width: 794px; border-radius: 6px; box-shadow: 0 20px 60px -20px #0006; }
+.ivp.a4 { max-width: 794px; border-radius: 0; box-shadow: 0 20px 60px -20px #0006; }
 .ivp.a4 .iv-hero { padding: 40px 48px 84px; }
 .ivp.a4 .iv-mark { width: 68px; height: 68px; font-size: 30px; border-radius: 20px; }
 .ivp.a4 .iv-id h2 { font-size: 34px; } .ivp.a4 .iv-id small { font-size: 15px; }

@@ -50,17 +50,22 @@ for (const size of ["A4", "Compact"] as const) {
       (await import("node:fs")).writeFileSync(`${process.env.KEEP_SHOTS}/screen-${size}.png`, screen);
     }
 
-    // Same shape: the picture is the paper at pixel ratio 2 (within a couple of pixels).
+    // Same shape, and sharp: the picture keeps the paper's proportions and is drawn at least 1,400 pixels wide
+    // (a 2x picture of the compact receipt was only about 720 and looked soft next to the PDF).
     const dims = await page.evaluate(async (b64) => { const i = new Image(); i.src = `data:image/png;base64,${b64}`; await i.decode(); return [i.naturalWidth, i.naturalHeight]; }, saved.toString("base64"));
-    expect(Math.abs(dims[0]! - box.width * 2)).toBeLessThanOrEqual(4);
-    expect(Math.abs(dims[1]! - box.height * 2)).toBeLessThanOrEqual(6);
-    // Same look: the gradient header is in the picture, not a blank or white block.
+    expect(dims[0]!).toBeGreaterThanOrEqual(1400);
+    expect(Math.abs(dims[0]! / dims[1]! - box.width / box.height) / (box.width / box.height)).toBeLessThan(0.01);
+    // Same look: the gradient header is in the picture, not a blank or white block, and it reaches the corners
+    // (rounded corners left white triangles at the top of the picture).
     const header = await page.evaluate(async (b64) => {
       const i = new Image(); i.src = `data:image/png;base64,${b64}`; await i.decode();
       const c = document.createElement("canvas"); c.width = i.naturalWidth; c.height = i.naturalHeight; const g = c.getContext("2d")!; g.drawImage(i, 0, 0);
-      const p = g.getImageData(40, 40, 1, 1).data; return [p[0]!, p[1]!, p[2]!];
+      const px = (x: number, y: number) => { const p = g.getImageData(x, y, 1, 1).data; return Math.min(p[0]!, p[1]!, p[2]!); };
+      return { inside: px(40, 40), topLeft: px(1, 1), topRight: px(i.naturalWidth - 2, 1) };
     }, saved.toString("base64"));
-    expect(Math.min(...header)).toBeLessThan(150); // dark brand colour, not white
+    expect(header.inside).toBeLessThan(150); // dark brand colour, not white
+    expect(header.topLeft).toBeLessThan(150);
+    expect(header.topRight).toBeLessThan(150);
     const diff = await difference(page, screen, saved);
     test.info().annotations.push({ type: "mean difference (0-255)", description: diff.toFixed(2) });
     expect(diff).toBeLessThan(8);
