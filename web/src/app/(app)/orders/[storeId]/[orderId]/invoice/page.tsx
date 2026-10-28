@@ -12,8 +12,10 @@ import type { Invoice, Order } from "@/lib/types";
 type View = { invoice: Invoice; order: Order; store: InvoiceStore };
 
 // The invoice as the customer gets it, in the store's colours. A4 or a compact receipt.
-// "Save to gallery" makes a picture of the paper and opens the phone's share sheet (choose "Save image");
+// "Save to gallery" opens the phone's share sheet with a picture of the paper (choose "Save image");
 // "Send on WhatsApp" shares the same picture; "Download PDF" opens the print sheet, which offers Save as PDF.
+// The picture is made ahead of time, as soon as the paper is on screen. A browser only opens the share sheet while the
+// tap is still fresh, so making the picture after the tap fails ("Must be handling a user gesture") on a slower phone.
 export default function InvoicePage() {
   const { storeId, orderId } = useParams<{ storeId: string; orderId: string }>();
   const toast = useToast();
@@ -23,10 +25,32 @@ export default function InvoicePage() {
   const [picked, setPicked] = useState<"a4" | "compact">("compact"); // the toggle moves at once; only the paper waits for its transition
   const [error, setError] = useState("");
   const [busy, setBusy] = useState<"" | "gallery" | "whatsapp">("");
+  const picture = useRef<Blob | null>(null); // the picture of the paper as it is now, made ahead of the tap
+  const [ready, setReady] = useState(false);
+  const [prepFailed, setPrepFailed] = useState(false);
 
   useEffect(() => {
     api<View>(`/stores/${storeId}/orders/${orderId}/invoice`).then(setView).catch((e) => setError(messageOf(e)));
   }, [storeId, orderId]);
+
+  // Make the picture whenever the paper (or its size) changes. The size switch is a view transition, so wait for it to settle.
+  useEffect(() => {
+    if (!view) return;
+    let stale = false;
+    picture.current = null;
+    setReady(false);
+    setPrepFailed(false);
+    const timer = setTimeout(async () => {
+      try {
+        if (!paper.current) throw new Error("no paper");
+        const blob = await invoiceImage(paper.current);
+        if (!stale) { picture.current = blob; setReady(true); }
+      } catch {
+        if (!stale) setPrepFailed(true); // the buttons then make the picture on the tap, as before
+      }
+    }, 900);
+    return () => { stale = true; clearTimeout(timer); };
+  }, [view, size]);
 
   const changeSize = (v: "a4" | "compact") => {
     const reduced = document.documentElement.dataset.motion === "reduced" || matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -35,19 +59,26 @@ export default function InvoicePage() {
     else setSize(v);
   };
 
-  async function send(kind: "gallery" | "whatsapp") {
-    if (!paper.current || !view) return;
+  // Nothing may be awaited between the tap and navigator.share, or the browser says the tap is too old.
+  function send(kind: "gallery" | "whatsapp") {
+    if (!view) return;
+    void deliver(kind, picture.current);
+  }
+  async function deliver(kind: "gallery" | "whatsapp", made: Blob | null) {
+    if (!view) return;
     setBusy(kind);
     try {
       const name = `${view.invoice.number ?? `draft-${view.order.orderNo}`}.png`;
-      const blob = await invoiceImage(paper.current);
+      const blob = made ?? (paper.current ? await invoiceImage(paper.current) : null);
+      if (!blob) throw new Error("The picture could not be made.");
       if (await shareImage(blob, name)) return;
       downloadImage(blob, name);
       const phone = view.order.customerPhone?.replace(/\D/g, "").replace(/^0/, "92");
       if (kind === "whatsapp" && phone) window.open(`https://wa.me/${phone}`, "_blank", "noopener");
       toast(kind === "whatsapp" ? "Image saved. Attach it in the WhatsApp chat." : "Invoice image saved");
     } catch (err) {
-      toast(messageOf(err), "bad");
+      if ((err as Error).name === "NotAllowedError") toast("Your phone wants one more tap to share. Tap the button again.", "bad");
+      else toast(messageOf(err), "bad");
     } finally {
       setBusy("");
     }
@@ -67,9 +98,9 @@ export default function InvoicePage() {
       <InvoicePaper ref={paper} invoice={invoice} order={order} store={store} size={size} />
 
       <div className="stack noprint" style={{ gap: 8 }}>
-        <button className="btn" disabled={busy !== ""} onClick={() => void send("gallery")}><Icon name="share" size={18} />{busy === "gallery" ? "Making the picture…" : "Save to gallery"}</button>
+        <button className="btn" disabled={busy !== "" || (!ready && !prepFailed)} onClick={() => send("gallery")}><Icon name="share" size={18} />{busy === "gallery" ? "Opening…" : !ready && !prepFailed ? "Getting the picture ready…" : "Save to gallery"}</button>
         <div className="inline" style={{ gap: 8, flexWrap: "wrap" }}>
-          <button className="btn quiet" style={{ flex: "1 1 200px" }} disabled={busy !== ""} onClick={() => void send("whatsapp")}><Icon name="chat" size={18} />{busy === "whatsapp" ? "Making…" : "Send on WhatsApp"}</button>
+          <button className="btn quiet" style={{ flex: "1 1 200px" }} disabled={busy !== "" || (!ready && !prepFailed)} onClick={() => send("whatsapp")}><Icon name="chat" size={18} />{busy === "whatsapp" ? "Opening…" : "Send on WhatsApp"}</button>
           <button className="btn quiet" style={{ flex: "1 1 200px" }} onClick={() => window.print()}><Icon name="print" size={18} />Download PDF</button>
         </div>
         <p className="note" style={{ textAlign: "center" }}>&quot;Save to gallery&quot; opens your phone&apos;s share sheet. Choose &quot;Save image&quot; and it lands in your photos.</p>

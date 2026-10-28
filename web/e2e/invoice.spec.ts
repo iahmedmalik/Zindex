@@ -71,3 +71,29 @@ for (const size of ["A4", "Compact"] as const) {
     expect(diff).toBeLessThan(8);
   });
 }
+
+// The browser only opens the share sheet while the tap is still "fresh". If the picture is made after the tap, a slow
+// phone runs out of time and the share fails with "Must be handling a user gesture". So the picture must already be
+// made, and the share must start inside the tap: here, within 100 ms of the click.
+test("Save to gallery and Send on WhatsApp open the share sheet inside the tap, not after the picture is made", async ({ page }) => {
+  await page.addInitScript(() => {
+    const w = window as unknown as { __shares: { at: number; files: number }[]; __clickAt: number };
+    w.__shares = [];
+    Object.defineProperty(navigator, "canShare", { value: () => true, configurable: true });
+    Object.defineProperty(navigator, "share", { value: async (d: ShareData) => { w.__shares.push({ at: performance.now(), files: d.files?.length ?? 0 }); }, configurable: true });
+    document.addEventListener("click", () => { w.__clickAt = performance.now(); }, true);
+  });
+  await signIn(page);
+  await createOrder(page, { name: "Share Buyer", rider: "300" });
+  await page.getByRole("link", { name: /View, print or share the invoice/ }).click();
+  await expect(page.locator("article.ivp")).toBeVisible();
+
+  for (const [i, name] of ["Save to gallery", "Send on WhatsApp"].entries()) {
+    await page.getByRole("button", { name }).click(); // waits until the button is ready to press
+    await expect.poll(() => page.evaluate(() => (window as unknown as { __shares: unknown[] }).__shares.length)).toBe(i + 1);
+    const lag = await page.evaluate(() => { const w = window as unknown as { __shares: { at: number }[]; __clickAt: number }; return w.__shares.at(-1)!.at - w.__clickAt; });
+    expect(lag, `${name}: the share sheet opened ${Math.round(lag)} ms after the tap`).toBeLessThan(100);
+    const files = await page.evaluate(() => (window as unknown as { __shares: { files: number }[] }).__shares.at(-1)!.files);
+    expect(files).toBe(1);
+  }
+});
