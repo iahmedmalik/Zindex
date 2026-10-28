@@ -153,6 +153,19 @@ test.describe("layout, motion and looks", () => {
     await expect(page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "New order" })).toBeVisible();
   });
 
+  test("sliding chip rows keep to the box they sit in instead of bleeding to the screen edge", async ({ page }) => {
+    await createOrder(page, { name: "Chip Edges", rider: "300" });
+    const edges = await page.locator(".chips").evaluateAll((rows) => rows.map((r) => {
+      const a = r.getBoundingClientRect(), b = r.parentElement!.getBoundingClientRect();
+      return { left: a.left - b.left, right: b.right - a.right };
+    }));
+    expect(edges.length).toBeGreaterThan(0);
+    for (const e of edges) {
+      expect(e.left).toBeGreaterThanOrEqual(-0.5); // a row used to start 16px left of its box
+      expect(e.right).toBeGreaterThanOrEqual(-0.5);
+    }
+  });
+
   test("dark mode and reduced motion are remembered", async ({ page }) => {
     await page.goto("/settings");
     await page.getByRole("radio", { name: "Dark", exact: true }).check({ force: true });

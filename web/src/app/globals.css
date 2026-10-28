@@ -167,7 +167,8 @@ textarea.input { min-height: 84px; resize: vertical; }
 .seg label { position: relative; z-index: 1; display: grid; place-items: center; min-height: 40px; padding: 0 8px; text-align: center; font-size: var(--t-sm); font-weight: 600; color: var(--ink-2); cursor: pointer; border-radius: var(--r-sm); transition: color var(--t-base) var(--ease); }
 .seg .thumb { position: absolute; z-index: 0; top: 4px; bottom: 4px; left: 4px; width: calc((100% - 8px) / var(--n, 3)); border-radius: var(--r-sm); background: var(--surface); box-shadow: 0 1px 0 var(--line), 0 2px 8px rgb(42 26 29 / 0.1); transform: translateX(calc(var(--at, 0) * 100%)); transition: transform var(--t-base) var(--ease); }
 .seg label:has(input:checked) { color: var(--ink); }
-.chips { display: flex; gap: 8px; overflow-x: auto; padding: 2px 16px 6px; margin: 0 -16px; scroll-snap-type: x proximity; scrollbar-width: none; }
+/* A sliding row keeps to the box it sits in (it used to bleed 16px past it, to the screen edge on a phone) and slides inside that box. */
+.chips { display: flex; gap: 8px; overflow-x: auto; padding: 8px 0 6px; margin: -6px 0 0; scroll-snap-type: x proximity; scrollbar-width: none; }
 .chip { flex: none; min-height: 44px; padding: 0 14px; border-radius: 999px; border: 0; background: var(--surface); font-weight: 500; font-size: var(--t-sm); cursor: pointer; display: inline-flex; align-items: center; gap: 8px; scroll-snap-align: start; transition: transform var(--t-press) var(--ease), background var(--t-base) var(--ease), border-color var(--t-base) var(--ease); position: relative; }
 .chip:active { transform: scale(0.96); }
 .chip .price { color: var(--ink-2); font-weight: 500; }
