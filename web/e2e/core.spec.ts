@@ -53,12 +53,12 @@ test.describe("an order from WhatsApp to the door", () => {
     await expect(page.getByText("packed, no rider yet").first()).toBeVisible();
   });
 
-  test("an invoice is a draft until finalised, then has the store's next number; A4 and compact both work", async ({ page }) => {
+  test("an invoice is made and numbered with the order, with no step to finalise it; A4 and compact both work", async ({ page }) => {
     await createOrder(page, { name: "Invoice Buyer" });
-    await page.getByRole("button", { name: "Make invoice" }).click();
-    await expect(page.getByText("Draft", { exact: true }).first()).toBeVisible();
-    await page.getByRole("button", { name: "Finalise" }).click();
-    await expect(page.getByText(/^SF-\d{4}$/)).toBeVisible();
+    await expect(page.getByText(/^SF-\d{4}$/)).toBeVisible(); // already there, with its number
+    await expect(page.getByRole("button", { name: /Make invoice|Finalise/ })).toHaveCount(0);
+    await expect(page.getByText("Draft", { exact: true })).toHaveCount(0);
+    await expect(page.getByText("Cash on delivery", { exact: true }).first()).toBeVisible();
     await page.getByRole("link", { name: /View, print or share the invoice/ }).click();
     const doc = page.locator("article.ivp");
     await expect(doc).toBeVisible();

@@ -67,7 +67,7 @@ describe("importing a Shopify orders file", () => {
     expect(ayesha).toMatchObject({ status: "pending", deliveryKind: "courier", payment: "paid", subtotal: 9700, deliveryCharge: 250, total: 9950 });
     expect(ayesha.items[0].productId).toBe(oud);
     expect(ayesha.items[1].productId).toBeNull();
-    expect((await call("get", `/v1/stores/${store}/orders/${ayesha.id}/invoice`)).body.invoice).toMatchObject({ status: "draft", number: null });
+    expect((await call("get", `/v1/stores/${store}/orders/${ayesha.id}/invoice`)).body.invoice).toMatchObject({ status: "final", number: expect.any(String) }); // imported orders are invoiced and numbered too
     expect((await call("get", `/v1/stores/${store}/stock`)).body.stock[0].onHand).toBe(10); // import never touches stock
 
     const again = await send(o.cookie, store, CSV);

@@ -15,7 +15,7 @@ export function importsRouter(db: Db): Router {
   const router = Router({ mergeParams: true });
 
   // Body: the Shopify orders CSV as text (Content-Type: text/csv), at most 2 MB.
-  // Every new order gets a draft invoice; orders already imported are skipped, so the same file
+  // Every new order is invoiced and numbered as it is made (insertOrder); orders already imported are skipped, so the same file
   // can be imported again safely. Products are matched to the catalogue by name.
   router.post("/shopify-orders", express.text({ type: ["text/csv", "text/plain"], limit: "2mb" }), async (req, res) => {
     if (typeof req.body !== "string" || req.body.trim() === "") throw new HttpError(400, "Send the Shopify orders CSV file.");
@@ -56,7 +56,6 @@ export function importsRouter(db: Db): Router {
           source: "shopify",
           externalRef: o.externalRef,
         });
-        await tx.execute(sql`insert into invoices (store_id, order_id) values (${storeId}, ${id})`);
         const [{ orderNo }] = (await rows<{ orderNo: number }>(tx, sql`select order_no from orders where id = ${id}`)) as [{ orderNo: number }];
         imported.push({ ref: o.externalRef, orderNo });
       }

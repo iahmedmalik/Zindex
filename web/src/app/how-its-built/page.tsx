@@ -53,7 +53,7 @@ export default function HowItsBuilt() {
 
       <section className="section">
         <h2>What it does</h2>
-        <p>Multi-store orders with seven stages, invoices (draft, final, edit history, in the store&apos;s own colours, A4 or receipt, saved as a picture or a PDF), an in-house stock ledger, customers, rider details with a copy-for-inDrive/Yango text, a public delivery card, COD cash tracking, courier parcels, a dashboard, WhatsApp messages from editable templates, sales and stock reports with Excel files, Shopify order import and product sync, and a full backup download.</p>
+        <p>Multi-store orders with seven stages, invoices (made and numbered with the order, edit history, in the store&apos;s own colours, A4 or receipt, saved as a picture or a PDF), an in-house stock ledger, customers, rider details with a copy-for-inDrive/Yango text, a public delivery card, COD cash tracking, courier parcels, a dashboard, WhatsApp messages from editable templates, sales and stock reports with Excel files, Shopify order import and product sync, and a full backup download.</p>
       </section>
 
       <section className="section">

@@ -133,11 +133,7 @@ paths:
     post: { tags: [Orders], summary: Put a cancelled or returned order's stock back (owner approval, once), responses: { "200": { description: OK }, "409": { description: Nothing to put back } } }
   /v1/stores/{storeId}/orders/{orderId}/invoice:
     parameters: [{ $ref: "#/components/parameters/storeId" }, { $ref: "#/components/parameters/orderId" }]
-    get: { tags: [Invoices], summary: The invoice with the store's branding and its edit history, responses: { "200": { description: OK }, "404": { description: No invoice yet } } }
-    post: { tags: [Invoices], summary: Make the draft (one per order; asking again returns it), responses: { "200": { description: Already there }, "201": { description: Created } } }
-  /v1/stores/{storeId}/orders/{orderId}/invoice/finalise:
-    parameters: [{ $ref: "#/components/parameters/storeId" }, { $ref: "#/components/parameters/orderId" }]
-    post: { tags: [Invoices], summary: Take the store's next gap-free number (SF-0007); doing it twice changes nothing, responses: { "200": { description: OK } } }
+    get: { tags: [Invoices], summary: "The invoice with the store's branding and its edit history. It is made, and numbered with the store's next gap-free number (SF-0007), when the order is created; an older order gets its invoice the first time it is opened. Edits are logged only once the order is out for delivery.", responses: { "200": { description: OK }, "404": { description: No invoice (a cancelled order made before invoices were automatic) } } }
   /v1/stores/{storeId}/invoices:
     parameters: [{ $ref: "#/components/parameters/storeId" }]
     get: { tags: [Invoices], summary: "Search by number, customer or phone (?q=)", responses: { "200": { description: OK } } }
@@ -157,7 +153,8 @@ paths:
     get: { tags: [Delivery], summary: "The store's parcels (?status=)", responses: { "200": { description: OK } } }
   /v1/stores/{storeId}/orders/{orderId}/card:
     parameters: [{ $ref: "#/components/parameters/storeId" }, { $ref: "#/components/parameters/orderId" }]
-    post: { tags: [Delivery], summary: "Make the customer's delivery card link (1 to 30 days, default 7); an earlier link stops working. The token is shown once; only its hash is stored.", responses: { "201": { description: "{ token, url, expiresAt }" } } }
+    get: { tags: [Delivery], summary: "The order's live delivery card link ({ card: { url, expiresAt } | null }). It is made by itself when the order is confirmed. The token is derived from the server secret and the order, so it can be shown again; only its hash is stored.", responses: { "200": { description: "{ card }" } } }
+    post: { tags: [Delivery], summary: "Make a new delivery card link (1 to 30 days, default 7); the earlier link stops working.", responses: { "201": { description: "{ token, url, expiresAt }" } } }
     delete: { tags: [Delivery], summary: Switch the link off, responses: { "200": { description: "{ revoked }" } } }
   /v1/public/card/{token}:
     get:
@@ -206,7 +203,7 @@ paths:
     parameters: [{ $ref: "#/components/parameters/storeId" }]
     post:
       tags: [Shopify]
-      summary: Bring in a Shopify "Export orders" CSV as pending orders with draft invoices. The same file twice adds nothing; stock never moves.
+      summary: Bring in a Shopify "Export orders" CSV as pending orders with their invoices, numbered as they are made. The same file twice adds nothing; stock never moves.
       requestBody: { required: true, content: { text/csv: { schema: { type: string } } } }
       responses: { "200": { description: "{ imported, alreadyImported, skipped, warnings }" }, "400": { description: Not a Shopify export } }
   /v1/stores/{storeId}/shopify:

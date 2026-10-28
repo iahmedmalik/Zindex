@@ -229,13 +229,12 @@ export default function OrderPage() {
           <section className="section">
             <h2>Invoice</h2>
             {invoice === undefined ? <div className="skel"><span /></div> : !invoice ? (
-              order.status === "cancelled" ? <p className="note">A cancelled order has no invoice.</p> : <button className="btn quiet" disabled={busy} onClick={() => run(async () => { await api(`${base}/invoice`, { method: "POST" }); return "Invoice draft made"; })}>Make invoice</button>
+              <p className="note">This order has no invoice.</p>
             ) : (
               <div className="inline">
-                <span className="num" style={{ fontWeight: 700, fontSize: "var(--t-lg)", letterSpacing: "0.02em" }}>{invoice.number ?? "Draft"}</span>
-                <span className={`stamp${invoice.status === "draft" ? " draft" : ""}`}>{invoice.status === "final" ? "Final" : "Draft"}</span>
+                <span className="num" style={{ fontWeight: 700, fontSize: "var(--t-lg)", letterSpacing: "0.02em" }}>{invoice.number}</span>
+                {order.status === "cancelled" ? <span className="badge bad">Cancelled</span> : <span className={`badge${order.payment === "paid" ? " ok" : ""}`}>{order.payment === "paid" ? "Paid" : order.payment === "cod" ? "Cash on delivery" : "Pay later"}</span>}
                 <span className="spacer" />
-                {invoice.status === "draft" && <button className="btn small" disabled={busy} onClick={() => run(async () => { const r = await api<{ invoice: Invoice }>(`${base}/invoice/finalise`, { method: "POST" }); return `Invoice ${r.invoice.number} is final`; })}>Finalise</button>}
                 <Link className="iconbtn" href={`/orders/${storeId}/${orderId}/invoice`} aria-label="View, print or share the invoice"><Icon name="print" /></Link>
               </div>
             )}

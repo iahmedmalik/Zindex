@@ -8,7 +8,7 @@ import { pgCode, rows, textArray } from "../db/query";
 import { HttpError } from "../http-error";
 import { calculateTotals } from "../invoice/totals";
 import { canMove, stages, type Stage } from "../orders/stages";
-import { recordInvoiceEdit } from "./invoices";
+import { createInvoice, recordInvoiceEdit } from "./invoices";
 import { deductForOrder, restoreForOrder, type StockWarning } from "../stock/ledger";
 import { normalisePhone } from "../phone";
 import { validateBody } from "../validate";
@@ -190,6 +190,7 @@ export async function insertOrder(tx: Tx, storeId: string, b: NewOrder, key: str
         returning id`,
   ))[0]!.id;
   await writeItems(tx, id, items);
+  await createInvoice(tx, storeId, id); // the invoice is made with the order, with the store's next number
   return id;
 }
 

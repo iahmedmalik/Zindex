@@ -13,8 +13,12 @@ const invoiceCols = sql`id, order_id, store_id, status, number, finalised_at, cr
 // The order fields an invoice shows. A change to any of these after the invoice is final is logged.
 const watched = ["customerName", "customerPhone", "address", "deliveryKind", "payment", "paymentMethod", "discountPercent", "deliveryCharge", "riderFee", "notes", "total", "items"] as const;
 
-/** Called by the order editor: if the order's invoice is final, write down what changed. */
+/**
+ * Called by the order editor. While the order is still being prepared its invoice simply follows it; once the order is
+ * out for delivery (or later), the customer may hold the invoice, so every change is written down.
+ */
 export async function recordInvoiceEdit(tx: Tx, before: Order, after: Order): Promise<void> {
+  if (before.status !== "out_for_delivery" && before.status !== "delivered") return;
   const changed = watched.filter((k) => JSON.stringify(before[k]) !== JSON.stringify(after[k]));
   if (changed.length === 0) return;
   const pick = (o: Order) => Object.fromEntries(watched.map((k) => [k, o[k]]));
@@ -23,6 +27,32 @@ export async function recordInvoiceEdit(tx: Tx, before: Order, after: Order): Pr
         select i.id, ${sql.raw(`array[${changed.map((c) => `'${c}'`).join(",")}]::text[]`)}, ${JSON.stringify(pick(before))}::jsonb, ${JSON.stringify(pick(after))}::jsonb
           from invoices i where i.order_id = ${after.id} and i.status = 'final'`,
   );
+}
+
+/** Gives a draft invoice its number: the store's next one, inside the caller's transaction (so a failed order burns none). */
+async function numberDraft(tx: Tx, storeId: string, orderId: string): Promise<void> {
+  const [draft] = await rows<{ id: string }>(tx, sql`select id from invoices where order_id = ${orderId} and status = 'draft'`);
+  if (!draft) return;
+  const [{ number }] = (await rows<{ number: string }>(tx, sql`select allocate_invoice_number(${storeId}) as number`)) as [{ number: string }];
+  await tx.execute(sql`update invoices set status = 'final', number = ${number}, finalised_at = now() where id = ${draft.id} and status = 'draft'`);
+}
+
+/** An order and its invoice are made together: numbered at once, one invoice per order, never a second number. */
+export async function createInvoice(tx: Tx, storeId: string, orderId: string): Promise<void> {
+  await tx.execute(sql`insert into invoices (store_id, order_id) values (${storeId}, ${orderId}) on conflict (order_id) do nothing`);
+  await numberDraft(tx, storeId, orderId);
+}
+
+/** Orders made before invoices were automatic get theirs (or their number) the first time the invoice is opened. */
+async function ensureInvoice(tx: Tx, storeId: string, orderId: string): Promise<void> {
+  const order = await loadOrder(tx, storeId, orderId);
+  if (!order) return;
+  const [existing] = await rows<{ status: string }>(tx, sql`select status from invoices where order_id = ${orderId}`);
+  if (!existing) {
+    if (order.status !== "cancelled") await createInvoice(tx, storeId, orderId);
+  } else if (existing.status === "draft") {
+    await numberDraft(tx, storeId, orderId);
+  }
 }
 
 async function loadInvoice(tx: Tx, storeId: string, orderId: string) {
@@ -38,42 +68,15 @@ async function loadInvoice(tx: Tx, storeId: string, orderId: string) {
 export function orderInvoiceRouter(db: Db): Router {
   const router = Router({ mergeParams: true });
 
+  // Opening an order's invoice is all it takes: it already exists, with its number.
   router.get("/", async (req, res) => {
-    const found = await asOwner(db, req.user!.id, (tx) => loadInvoice(tx, storeIdOf(req), idParam(req, "orderId", "Order")));
-    if (!found) throw new HttpError(404, "This order has no invoice yet.");
-    res.json(found);
-  });
-
-  // Makes the draft. Asking again returns the same invoice: one order never gets two.
-  router.post("/", async (req, res) => {
-    const storeId = storeIdOf(req);
-    const orderId = idParam(req, "orderId", "Order");
-    const result = await asOwner(db, req.user!.id, async (tx) => {
-      const order = await loadOrder(tx, storeId, orderId);
-      if (!order) throw new HttpError(404, "Order not found.");
-      if (order.status === "cancelled") throw new HttpError(409, "A cancelled order cannot be invoiced.");
-      const existing = await loadInvoice(tx, storeId, orderId);
-      if (existing) return { ...existing, created: false };
-      await tx.execute(sql`insert into invoices (store_id, order_id) values (${storeId}, ${orderId}) on conflict (order_id) do nothing`);
-      return { ...(await loadInvoice(tx, storeId, orderId))!, created: true };
-    });
-    const { created, ...body } = result;
-    res.status(created ? 201 : 200).json(body);
-  });
-
-  // Finalising gives the invoice its number. Doing it twice changes nothing.
-  router.post("/finalise", async (req, res) => {
     const storeId = storeIdOf(req);
     const orderId = idParam(req, "orderId", "Order");
     const found = await asOwner(db, req.user!.id, async (tx) => {
-      const current = await loadInvoice(tx, storeId, orderId);
-      if (!current) throw new HttpError(404, "Create the invoice draft first.");
-      if (current.invoice.status === "final") return current;
-      if (current.order!.status === "cancelled") throw new HttpError(409, "A cancelled order cannot be invoiced.");
-      const [{ number }] = (await rows<{ number: string }>(tx, sql`select allocate_invoice_number(${storeId}) as number`)) as [{ number: string }];
-      await tx.execute(sql`update invoices set status = 'final', number = ${number}, finalised_at = now() where id = ${current.invoice.id} and status = 'draft'`);
+      await ensureInvoice(tx, storeId, orderId);
       return loadInvoice(tx, storeId, orderId);
     });
+    if (!found) throw new HttpError(404, "This order has no invoice.");
     res.json(found);
   });
 

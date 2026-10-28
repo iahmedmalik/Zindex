@@ -9,8 +9,6 @@ async function openInvoice(page: Page) {
   await page.addInitScript(() => { Object.defineProperty(navigator, "canShare", { value: undefined }); });
   await signIn(page);
   await createOrder(page, { name: "Picture Buyer", rider: "300", discount: 10 });
-  await page.getByRole("button", { name: "Make invoice" }).click();
-  await page.getByRole("button", { name: "Finalise" }).click();
   await expect(page.getByText(/^SF-\d{4}$/)).toBeVisible();
   await page.getByRole("link", { name: /View, print or share the invoice/ }).click();
   await expect(page.locator("article.ivp")).toBeVisible();

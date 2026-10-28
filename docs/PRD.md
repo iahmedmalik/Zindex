@@ -23,13 +23,13 @@ One owner login per account in v1. No staff roles. Open sign-up is deliberately 
 |---|---|
 | Accounts and stores | Sign in with a confirmed email; run several stores; each has its own invoice letters, numbering, colour, phone and address. |
 | Orders | One-page phone form: customer by phone (saved and reused), items from the catalogue or typed, percent discount, rider fee or courier fee, payment (paid in advance, cash on delivery, pay later), notes. Seven stages. A retried save never makes a second order. |
-| Invoices | Draft, then final with the store's next gap-free number. Edits after final are logged. A4 or compact receipt, print or PDF, image to share. |
+| Invoices | Made with the order and numbered at once with the store's next gap-free number (a cancelled order keeps its number). Edits are logged once the order is out for delivery. A4 or compact receipt, print or PDF, image to share. |
 | Products and stock | A catalogue and price per store. In-house stock as an append-only ledger: one deduction when the order is confirmed, put back only when the owner approves, warnings at zero but sales never blocked. |
 | Delivery | Rider details and a ready-made text to paste into inDrive or Yango; a public delivery card link; manual courier parcel records with tracking and failure reasons. |
 | Money | The owner marks advance payments received and COD cash handed over; a cash-with-riders summary. |
 | Messages | Seven editable WhatsApp templates per store and `wa.me` links. |
 | Insight | Dashboard of what needs action today; sales and stock reports with Excel files; complete backup download. |
-| Shopify | Import the orders export as pending orders with draft invoices; read-only product sync. Stock is never synced. |
+| Shopify | Import the orders export as pending orders, each with its invoice; read-only product sync. Stock is never synced. |
 
 ## Money rules (confirmed by the owner)
 

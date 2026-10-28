@@ -41,8 +41,6 @@
 .stage.delivered, .stage.cancelled { background: var(--line); } .stage.returned { background: var(--bad); }
 .row .end { display: grid; justify-items: end; gap: 6px; text-align: right; }
 .row .amt { font-weight: 600; font-size: var(--t-sm); }
-.stamp { display: inline-grid; place-items: center; padding: 2px 10px; border: 2px solid var(--ok); color: var(--ok); border-radius: 6px; font-size: var(--t-xs); font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; rotate: -4deg; }
-.stamp.draft { border-color: var(--warn); color: var(--warn); }
 
 /* Loading: skeleton lines in place of the content, never a spinner in the middle. */
 .skel { display: grid; gap: 12px; }

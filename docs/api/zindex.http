@@ -79,13 +79,7 @@ Content-Type: application/json
 ### Put stock back after a cancelled or returned order (only the owner can approve this)
 POST {{api}}/v1/stores/{{store}}/orders/{{order}}/restore-stock
 
-### Invoice: draft, then final (takes the store's next number)
-POST {{api}}/v1/stores/{{store}}/orders/{{order}}/invoice
-
-###
-POST {{api}}/v1/stores/{{store}}/orders/{{order}}/invoice/finalise
-
-###
+### Invoice: made and numbered with the order (opening it is all it takes)
 GET {{api}}/v1/stores/{{store}}/orders/{{order}}/invoice
 
 ### Local delivery: the text to paste into inDrive or Yango, and the rider's details
