@@ -5,6 +5,7 @@ import type { Config } from "./config";
 import type { Db } from "./db/client";
 import { HttpError } from "./http-error";
 import { publicCardRouter } from "./routes/cards";
+import { demoRouter } from "./routes/demo";
 import { createRoutes } from "./routes";
 
 // Everything the real server hands to the app. Tests can build the app without it (health check only)
@@ -35,6 +36,8 @@ export function createApp(ctx?: AppContext): Express {
 
   // The delivery card is opened by customers without an account, so it sits before the sign-in check.
   if (ctx) app.use("/v1/public/card", publicCardRouter(ctx.db));
+  // "Try the demo" signs the demo owner in itself, so it also sits before the sign-in check.
+  if (ctx) app.use("/v1/demo", demoRouter(ctx));
   if (ctx) app.use("/v1", createRoutes(ctx));
 
   app.use((_req, _res, next) => next(new HttpError(404, "Not found.")));

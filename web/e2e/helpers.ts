@@ -8,6 +8,16 @@ export async function signIn(page: Page) {
   await page.getByLabel("Password").fill(DEMO.password);
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await expect(page.getByText("Needs you now")).toBeVisible();
+  await skipTour(page);
+}
+
+/** A first sign-in opens the walk-through; every test that is not about it closes it (and so marks it as seen). */
+export async function skipTour(page: Page) {
+  const skip = page.getByRole("button", { name: "Skip tour" });
+  if (await skip.waitFor({ state: "visible", timeout: 6000 }).then(() => true, () => false)) {
+    await skip.click();
+    await expect(skip).toBeHidden();
+  }
 }
 
 /** A phone number nobody has used, so the customer lookup does not offer an older customer. */

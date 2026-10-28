@@ -1,11 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Logo, RouteBackdrop } from "@/components/graphics";
+import { Tour } from "@/components/Tour";
 import { Icon, ToastProvider } from "@/components/ui";
 import { apply, load } from "@/lib/appearance";
+import { api } from "@/lib/api";
 import { SessionProvider, useSession } from "@/lib/session";
 
 const tabs = [
@@ -15,6 +17,9 @@ const tabs = [
   { href: "/products", label: "Stock", icon: "stock" },
   { href: "/more", label: "More", icon: "more" },
 ];
+
+export const TOUR_NOW = "zindex.tour.now"; // set when the demo starts or the tour is replayed
+export const TOUR_SEEN = "zindex.tour.seen.";
 
 const allDot = (colors: string[]) => (colors.length > 1 ? `conic-gradient(${colors.map((c, i) => `${c} ${(i * 100) / colors.length}% ${((i + 1) * 100) / colors.length}%`).join(", ")})` : (colors[0] ?? "var(--brand)"));
 
@@ -50,10 +55,36 @@ function StoreSheet({ open, close }: { open: boolean; close: () => void }) {
 
 function Chrome({ children }: { children: React.ReactNode }) {
   const path = usePathname();
-  const { stores, store } = useSession();
+  const { stores, store, user } = useSession();
+  const router = useRouter();
   const [sheet, setSheet] = useState(false);
+  const [tour, setTour] = useState(false);
   useEffect(() => apply(load()), []);
   useEffect(() => setSheet(false), [path]);
+
+  // The tour opens on Today: every time the demo is started (or "Replay the tour" is pressed), and on a
+  // normal owner's first sign-in. It waits until Today has drawn the parts it points at.
+  useEffect(() => {
+    if (path !== "/") return;
+    let wanted = false;
+    try {
+      wanted = sessionStorage.getItem(TOUR_NOW) === "1" || (!user.demo && !localStorage.getItem(`${TOUR_SEEN}${user.id}`));
+    } catch {}
+    if (!wanted) return;
+    let tries = 0;
+    const timer = setInterval(() => {
+      if (document.querySelector(".hero") || ++tries > 20) { clearInterval(timer); if (document.querySelector(".hero")) setTour(true); }
+    }, 300);
+    return () => clearInterval(timer);
+  }, [path, user.id, user.demo]);
+
+  const closeTour = useCallback((completed: boolean) => {
+    setTour(false);
+    try {
+      sessionStorage.removeItem(TOUR_NOW);
+      if (completed) localStorage.setItem(`${TOUR_SEEN}${user.id}`, "1");
+    } catch {}
+  }, [user.id]);
   const active = (href: string) =>
     href === "/" ? path === "/" : href === "/orders" ? path === "/orders" || (path.startsWith("/orders/") && path !== "/orders/new") : href === "/more" ? ["/more", "/customers", "/reports", "/shipments", "/settings"].some((p) => path.startsWith(p)) : path.startsWith(href);
 
@@ -78,7 +109,16 @@ function Chrome({ children }: { children: React.ReactNode }) {
           </span>
         )}
       </header>
-      <main>{children}</main>
+      <main>
+        {user.demo && (
+          <div className="demo-note arrive" role="status">
+            <span>You&apos;re in the demo. Everything here is made up, and it resets every day.</span>
+            <button className="linkbtn" onClick={async () => { try { await api("/auth/sign-out", { method: "POST", body: {} }); } finally { router.replace("/sign-in"); } }}>Sign out</button>
+          </div>
+        )}
+        {children}
+      </main>
+      <Tour open={tour} onClose={closeTour} />
       <nav className="tabs" aria-label="Main">
         {tabs.map((t) => (
           <Link key={t.href} href={t.href} className={t.fab ? "new" : undefined} aria-label={t.fab ? t.label : undefined} aria-current={active(t.href) ? "page" : undefined}>

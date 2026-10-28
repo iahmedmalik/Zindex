@@ -32,9 +32,12 @@ export default function MorePage() {
           </li>
         ))}
       </ul>
+      <div className="inline" style={{ gap: 8, flexWrap: "wrap" }}>
+      <button className="btn quiet" style={{ justifySelf: "start" }} onClick={() => { try { sessionStorage.setItem("zindex.tour.now", "1"); } catch {} router.push("/"); }}>Replay the tour</button>
       <button className="btn quiet" style={{ justifySelf: "start" }} onClick={async () => {
         try { await api("/auth/sign-out", { method: "POST", body: {} }); router.replace("/sign-in"); } catch (e) { toast(messageOf(e), "bad"); }
       }}>Sign out</button>
+      </div>
     </>
   );
 }

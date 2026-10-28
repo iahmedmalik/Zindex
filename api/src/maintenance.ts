@@ -1,5 +1,7 @@
 import { sql } from "drizzle-orm";
+import type { AppContext } from "./app";
 import type { Db } from "./db/client";
+import { ensureDemo } from "./routes/demo";
 
 /** Deletes rider photos whose card link is long gone (rule in sql/017). Returns how many went. */
 export async function purgeDeliveryPhotos(db: Db): Promise<number> {
@@ -23,6 +25,26 @@ export function startPhotoCleanup(db: Db, log: (msg: string) => void = console.l
     }
   };
   const first = setTimeout(run, 30_000);
+  const every = setInterval(run, SIX_HOURS);
+  first.unref();
+  every.unref();
+  return () => { clearTimeout(first); clearInterval(every); };
+}
+
+/**
+ * Keeps the demo account fresh: shortly after start-up and then every 6 hours, re-seed it if it is
+ * a day old, so the next visitor never meets yesterday's mess. It does nothing unless the demo is configured.
+ */
+export function startDemoReset(ctx: AppContext, port: number): () => void {
+  if (!ctx.config.DEMO_EMAIL || !ctx.config.DEMO_PASSWORD) return () => {};
+  const run = async () => {
+    try {
+      await ensureDemo(ctx, `http://127.0.0.1:${port}`);
+    } catch (err) {
+      console.error("Demo refresh failed:", err);
+    }
+  };
+  const first = setTimeout(run, 45_000);
   const every = setInterval(run, SIX_HOURS);
   first.unref();
   every.unref();

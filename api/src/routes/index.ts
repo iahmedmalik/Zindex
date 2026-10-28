@@ -3,6 +3,7 @@ import type { AppContext } from "../app";
 import { backupRouter } from "./backup";
 import { cardsRouter } from "./cards";
 import { customersRouter } from "./customers";
+import { demoEmails, demoGuard } from "./demo";
 import { dashboardRouter } from "./dashboard";
 import { deliveriesRouter } from "./deliveries";
 import { importsRouter } from "./imports";
@@ -23,7 +24,8 @@ import { whatsappRouter } from "./whatsapp";
 export function createRoutes(ctx: AppContext): Router {
   const router = Router();
   router.use(requireUser(ctx.auth));
-  router.get("/me", (req, res) => res.json({ user: req.user }));
+  router.use(demoGuard(ctx));
+  router.get("/me", (req, res) => res.json({ user: { ...req.user, demo: demoEmails(ctx).includes(req.user!.email.toLowerCase()) } }));
   router.use("/stores", storesRouter(ctx.db));
   router.use("/dashboard", dashboardRouter(ctx.db));
   router.use("/backup", backupRouter(ctx.db));

@@ -7,7 +7,7 @@ import type { Store } from "./types";
 
 // Who is signed in and which stores they have. "All stores" is the null selection.
 type Session = {
-  user: { id: string; name: string; email: string };
+  user: { id: string; name: string; email: string; demo?: boolean };
   stores: Store[];
   storeId: string | null; // the chosen store, or null for all stores
   store: Store | null;

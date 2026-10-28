@@ -28,3 +28,11 @@ services:
       # Optional: Shopify product sync. One line of JSON, read_products only. Leave unset to switch it off.
       - key: SHOPIFY_APPS
         sync: false
+      # Who may sign up (comma-separated emails). Leave it set in production: Zindex is by invitation.
+      - key: OWNER_EMAILS
+        sync: false
+      # The public demo ("Try the demo"). Both set = the demo is on; the password is public on purpose.
+      - key: DEMO_EMAIL
+        sync: false
+      - key: DEMO_PASSWORD
+        sync: false

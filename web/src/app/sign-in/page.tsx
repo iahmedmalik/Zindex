@@ -19,6 +19,19 @@ export default function SignInPage() {
   const [error, setError] = useState("");
   const [sent, setSent] = useState<"" | "verify" | "reset">("");
 
+  async function tryDemo() {
+    setBusy(true);
+    setError("");
+    try {
+      await api("/demo/start", { method: "POST", body: {} });
+      try { sessionStorage.setItem("zindex.tour.now", "1"); } catch {}
+      router.replace("/");
+    } catch (err) {
+      setError(messageOf(err));
+      setBusy(false);
+    }
+  }
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
@@ -60,12 +73,14 @@ export default function SignInPage() {
         ) : (
           <form className="stack" style={{ gap: 16 }} onSubmit={submit}>
             {mode !== "reset" && <Seg label="Sign in or create an account" value={mode} onChange={(v) => { setMode(v); setError(""); }} options={[["in", "Sign in"], ["up", "New account"]] as const} />}
+            <div className={`expand${mode === "up" ? " open" : ""}`}><div><p className="note">Zindex is by invitation. Use the email address the owner gave access to.</p></div></div>
             <div className={`expand${mode === "up" ? " open" : ""}`}><div><label className="field"><span>Your name</span><input className="input" value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" required={mode === "up"} tabIndex={mode === "up" ? 0 : -1} /></label></div></div>
             <label className="field"><span>Email</span><input className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" required /></label>
             <div className={`expand${mode !== "reset" ? " open" : ""}`}><div><label className="field"><span>Password{mode === "up" ? " (10 characters or more)" : ""}</span><input className="input" type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete={mode === "up" ? "new-password" : "current-password"} minLength={mode === "in" ? undefined : 10} required={mode !== "reset"} tabIndex={mode !== "reset" ? 0 : -1} /></label></div></div>
             {error && <p className="error" role="alert">{error}</p>}
             <button className="btn" disabled={busy}>{busy ? "Please wait…" : mode === "up" ? "Create account" : mode === "reset" ? "Send reset link" : "Sign in"}</button>
             <button type="button" className="linkbtn" style={{ justifySelf: "start" }} onClick={() => { setMode(mode === "reset" ? "in" : "reset"); setError(""); }}>{mode === "reset" ? "Back to sign in" : "Forgot your password?"}</button>
+            {mode !== "reset" && <p className="demo-line"><button type="button" className="linkbtn demo-link" disabled={busy} onClick={() => void tryDemo()}>Try the demo</button><span className="note">No sign-up needed.</span></p>}
           </form>
         )}
         <Link className="note" href="/how-its-built" style={{ justifySelf: "center" }}>How it&apos;s built</Link>
@@ -73,4 +88,3 @@ export default function SignInPage() {
     </main>
   );
 }
-            <div className={`expand${mode === "up" ? " open" : ""}`}><div><p className="note">Zindex is by invitation. Use the email address the owner gave access to.</p></div></div>
