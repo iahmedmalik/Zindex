@@ -138,6 +138,8 @@ main { width: 100%; max-width: 760px; margin: 0 auto; padding: 20px 16px 28px; d
   main { max-width: 1040px; padding: 32px 32px 48px; }
   .split { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(280px, 1fr); gap: 40px; align-items: start; }
 }
+/* On a phone the two columns of Today and of an order stack with the same gap as the sections inside them; the laptop rule above has its own. */
+@media (max-width: 899px) { .split { display: grid; gap: 28px; } }
 .split > * { min-width: 0; }
 .split .side { display: grid; gap: 28px; }
 
