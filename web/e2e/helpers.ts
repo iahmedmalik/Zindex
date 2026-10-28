@@ -50,3 +50,11 @@ export async function addRider(page: Page, r: { name: string; bike?: string; pho
   if (r.phone) await page.getByLabel("Rider phone").fill(r.phone);
   if (r.tracking) await page.getByLabel("Tracking link").fill(r.tracking);
 }
+
+/** Opens the Stock screen on Sheen Food, waiting for the page to say whether a store still has to be picked. */
+export async function openStock(page: Page) {
+  await page.goto("/products");
+  const pick = page.getByText("Pick a store");
+  if (await pick.waitFor({ state: "visible", timeout: 6000 }).then(() => true, () => false)) await page.getByRole("button", { name: /Sheen Food/ }).first().click();
+  await expect(page.getByRole("button", { name: "Product", exact: true })).toBeVisible();
+}

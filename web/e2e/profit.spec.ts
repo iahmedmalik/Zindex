@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { freshPhone, signIn } from "./helpers";
+import { freshPhone, openStock, signIn } from "./helpers";
 
 // Profit per store: a cost per piece on an order line, profit and what is missing in Reports, and the list where a
 // missing cost is filled in on purpose. Names are unique because the desktop and phone runs share one database.
@@ -41,9 +41,7 @@ test.describe("profit", () => {
   });
 
   test("a product shows its price and cost per piece, and a new cost is saved with a note that old sales keep theirs", async ({ page }) => {
-    await page.goto("/products");
-    const store = page.getByRole("button", { name: /Sheen Food/ }).first();
-    if (await store.isVisible().catch(() => false)) await store.click();
+    await openStock(page);
     await page.getByRole("button", { name: /Garam masala/ }).first().click();
     await expect(page.getByText(/per pc · /).first()).toBeVisible();
     await page.getByLabel("Cost per pc (optional)").first().fill("310");

@@ -126,6 +126,10 @@ export default function StockPage() {
                       ))}
                     </ul>
                   )}
+                  <button className="btn danger" style={{ justifySelf: "start" }} onClick={async () => {
+                    if (!confirm(`Delete ${r.name}? It leaves your catalogue and Stock. Orders already made keep their lines, so sales, profit and invoices do not change. This product's stock history is deleted with it.`)) return;
+                    try { await api(`/stores/${storeId}/products/${r.productId}`, { method: "DELETE" }); toast(`${r.name} deleted`); setOpen(null); await load(); } catch (err) { toast(messageOf(err), "bad"); }
+                  }}>Delete product</button>
                 </div>
               </div></div>
             </li>

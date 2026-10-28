@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { PaymentsBox } from "@/components/payments-box";
 import { Receipt } from "@/components/receipt";
@@ -31,6 +31,8 @@ export default function OrderPage() {
   const { storeId, orderId } = useParams<{ storeId: string; orderId: string }>();
   const { stores } = useSession();
   const toast = useToast();
+  const router = useRouter();
+  const [deletable, setDeletable] = useState<{ ok: boolean; reason: string | null } | null>(null);
   const base = `/stores/${storeId}/orders/${orderId}`;
   const store = stores.find((s) => s.id === storeId);
   const [order, setOrder] = useState<Order | null>(null);
@@ -52,8 +54,9 @@ export default function OrderPage() {
 
   const load = useCallback(async () => {
     try {
-      const { order: o } = await api<{ order: Order }>(base);
+      const { order: o, deletable: d } = await api<{ order: Order; deletable: { ok: boolean; reason: string | null } }>(base);
       setOrder(o);
+      setDeletable(d);
       api<{ invoice: Invoice }>(`${base}/invoice`).then((r) => setInvoice(r.invoice)).catch(() => setInvoice(null));
       api<{ card: { url: string | null } | null }>(`${base}/card`).then((r) => setCard(r.card)).catch(() => setCard(null));
       if (o.deliveryKind === "local") {
@@ -266,6 +269,17 @@ export default function OrderPage() {
               </div>
             )}
           </section>
+
+          {(order.status === "pending" || order.status === "cancelled") && deletable && (
+            <section className="well">
+              <h2>Delete this order</h2>
+              <p className="note">{deletable.ok ? "Removes the order, its invoice and its delivery link. The invoice number is given back, so the numbers stay without gaps." : deletable.reason}</p>
+              <button className="btn danger" disabled={busy || !deletable.ok} onClick={() => {
+                if (!confirm(`Delete order #${order.orderNo} for ${order.customerName}? It, its invoice and its delivery link are removed for good.`)) return;
+                void run(async () => { await api(base, { method: "DELETE" }); toast(`Order #${order.orderNo} deleted`); router.push("/orders"); }).catch(() => undefined);
+              }}>Delete order</button>
+            </section>
+          )}
 
           {(order.status === "cancelled" || order.status === "returned") && order.stockApplied && (
             <section className="well">

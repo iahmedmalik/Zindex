@@ -151,7 +151,7 @@ export default function NewOrderPage() {
               </span>
               {/* Both are for one piece. The cost is saved on this line, so a later change to the product's cost never changes it. */}
               <div style={{ gridColumn: "1 / -1", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                <label className="field"><span>Price per pc</span><input className="input num" inputMode="numeric" aria-label={`Price of ${l.name || "item"} per pc`} style={{ minHeight: 38, padding: "6px 10px" }} value={l.unitPrice || ""} placeholder="0" onChange={(e) => change(l.key, { unitPrice: digits(e.target.value) })} /></label>
+                <label className="field"><span>Price per pc{l.productId && products.find((p) => p.id === l.productId)?.price !== l.unitPrice ? " · this order only" : ""}</span><input className="input num" inputMode="numeric" aria-label={`Price of ${l.name || "item"} per pc`} style={{ minHeight: 38, padding: "6px 10px" }} value={l.unitPrice || ""} placeholder="0" onChange={(e) => change(l.key, { unitPrice: digits(e.target.value) })} /></label>
                 <label className="field"><span>Cost per pc (optional)</span><input className="input num" inputMode="numeric" aria-label={`Cost of ${l.name || "item"} per pc`} style={{ minHeight: 38, padding: "6px 10px" }} value={l.unitCost ?? ""} placeholder="not set" onChange={(e) => change(l.key, { unitCost: e.target.value.replace(/\D/g, "") === "" ? null : digits(e.target.value) })} /></label>
               </div>
             </li>

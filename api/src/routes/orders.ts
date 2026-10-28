@@ -184,6 +184,28 @@ async function writeItems(tx: Tx, orderId: string, items: Resolved[]) {
   }
 }
 
+type Deletable = { ok: boolean; reason: string | null; invoiceSeq: number | null };
+
+/**
+ * An order may be deleted only while nothing has really happened to it: pending, or cancelled with its stock back, and
+ * no payment recorded. And only if its invoice is the store's latest number, so giving the number back leaves no gap.
+ * Anything else is cancelled instead: a cancelled order keeps its invoice number as a void.
+ */
+async function checkDeletable(tx: Tx, storeId: string, o: Order): Promise<Deletable> {
+  const no = (reason: string): Deletable => ({ ok: false, reason, invoiceSeq: null });
+  if (o.status !== "pending" && o.status !== "cancelled") return no("Only a pending or cancelled order can be deleted. Cancel it first, or keep it as a record.");
+  if (o.stockApplied) return no("Put the stock back first, then delete it.");
+  if (o.paid > 0) return no("Undo the recorded payments first, then delete it.");
+  const [inv] = await rows<{ number: string | null }>(tx, sql`select number from invoices where order_id = ${o.id}`);
+  if (!inv?.number) return { ok: true, reason: null, invoiceSeq: null };
+  const seq = Number(inv.number.split("-").pop());
+  const [st] = await rows<{ nextInvoiceNo: number }>(tx, sql`select next_invoice_no from stores where id = ${storeId}`);
+  if (!Number.isInteger(seq) || !st || seq !== st.nextInvoiceNo - 1) {
+    return no(`Invoice ${inv.number} is not the store's latest, so deleting it would leave a gap in the numbers. Cancel the order instead: it keeps its number.`);
+  }
+  return { ok: true, reason: null, invoiceSeq: seq };
+}
+
 export type NewOrder = Omit<z.infer<typeof createBody>, "source" | "idempotencyKey"> & { source?: "whatsapp" | "manual" | "shopify"; externalRef?: string | null };
 
 /** Saves one new order: resolves the items, works out the totals, saves the customer and takes the next order number. */
@@ -253,9 +275,34 @@ export function ordersRouter(db: Db, config: Config): Router {
   });
 
   router.get("/:id", async (req, res) => {
-    const order = await asOwner(db, req.user!.id, (tx) => loadOrder(tx, storeIdOf(req), idParam(req, "id", "Order")));
-    if (!order) throw new HttpError(404, "Order not found.");
-    res.json({ order });
+    const found = await asOwner(db, req.user!.id, async (tx) => {
+      const order = await loadOrder(tx, storeIdOf(req), idParam(req, "id", "Order"));
+      return order ? { order, deletable: await checkDeletable(tx, storeIdOf(req), order) } : null;
+    });
+    if (!found) throw new HttpError(404, "Order not found.");
+    res.json({ order: found.order, deletable: { ok: found.deletable.ok, reason: found.deletable.reason } });
+  });
+
+  // Deleting is strict, so the books stay honest: see checkDeletable. The order's invoice, items, delivery, card links
+  // and parcel go with it, and the invoice number is given back (it was the latest, so no gap appears).
+  router.delete("/:id", async (req, res) => {
+    const storeId = storeIdOf(req);
+    const id = idParam(req, "id", "Order");
+    const result = await asOwner(db, req.user!.id, async (tx) => {
+      const order = await loadOrder(tx, storeId, id);
+      if (!order) throw new HttpError(404, "Order not found.");
+      const check = await checkDeletable(tx, storeId, order);
+      if (!check.ok) throw new HttpError(409, check.reason!);
+      await tx.execute(sql`delete from orders where id = ${id}`);
+      let released = false;
+      if (check.invoiceSeq !== null) {
+        const [r] = await rows<{ ok: boolean }>(tx, sql`select release_invoice_number(${storeId}::uuid, ${check.invoiceSeq}::int) as ok`);
+        if (!r?.ok) throw new HttpError(409, "Another order was made at the same moment, so its invoice number could not be given back. Nothing was deleted. Try again.");
+        released = true;
+      }
+      return { deleted: true, invoiceNumberReleased: released };
+    });
+    res.json(result);
   });
 
   router.post("/", validateBody(createBody), async (req, res) => {
