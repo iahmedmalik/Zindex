@@ -142,3 +142,15 @@ test.describe("looks", () => {
     await ctx.close();
   });
 });
+
+test.describe("new store", () => {
+  test("starts with maroon selected as its colour, not orange", async ({ page }) => {
+    await signIn(page);
+    await page.goto("/settings");
+    const form = page.locator("details", { hasText: "Add a store" });
+    await form.getByText("Add a store", { exact: true }).click();
+    await expect(form.getByRole("radio", { name: "#5d1b23", checked: true })).toBeVisible();
+    await expect(form.getByRole("radio", { name: "#8a3b12", checked: true })).toHaveCount(0); // orange is still there to pick
+    await expect(form.getByRole("radio", { name: "#8a3b12" })).toBeVisible();
+  });
+});
