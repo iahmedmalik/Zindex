@@ -1,17 +1,17 @@
 # Zindex: test report
 
-**Run:** 28 October 2026 (after the invoice, owner-only sign-up, demo and tour were added), on the developer's Windows 10 computer, Node 22, a local PostgreSQL, desktop Edge (Chromium).
+**Run:** 29 October 2026 (after the first live deploy and the owner's own phone trial), on the developer's Windows 10 computer, Node 22, a local PostgreSQL, desktop Edge (Chromium). The web server for the browser run was started with its clock on UTC, as Vercel's is.
 
 ## Results
 
 | Suite | Result |
 |---|---|
-| API tests (Vitest, real local PostgreSQL) | **125 passed**, 0 failed, 22 test files |
-| Browser tests (Playwright, against the production build) | **42 passed**, 0 failed: 21 tests, each run at desktop 1280 px and a 375 px phone view (includes the saved-invoice-picture comparison, the tour and the demo) |
-| Typecheck | web clean; API has one known error in `scripts/load-test.ts` (the load-test script, not the server or the tests) |
+| API tests (Vitest, real local PostgreSQL) | **133 passed**, 0 failed, 22 test files |
+| Browser tests (Playwright, against the production build) | **54 passed**, 0 failed: 27 tests, each run at desktop 1280 px and a 375 px phone view (includes the saved-invoice-picture comparison, the tour, the demo, the customer card following the order, and the cash views) |
+| Typecheck | web and API clean |
 | Production build (Next.js) | passes |
 | Dependency audit (`npm audit`) | 0 vulnerabilities |
-| Accessibility (axe-core, WCAG 2 A/AA including colour contrast), page overflow and touch-target size | 11 screens x laptop and 375 px x light and dark = 44 page views: **0 axe violations, 0 pages wider than the screen**. Two touch-size notes, both by design: a visually hidden radio behind a custom control, and the options inside a 46 px segmented control |
+| Accessibility (axe-core, WCAG 2 A/AA including colour contrast), page overflow and touch-target size (run 28 Oct, not repeated since the 29 Oct changes) | 11 screens x laptop and 375 px x light and dark = 44 page views: **0 axe violations, 0 pages wider than the screen**. Two touch-size notes, both by design: a visually hidden radio behind a custom control, and the options inside a 46 px segmented control |
 | CI (GitHub Actions: typecheck, tests, build) | green on every API commit |
 
 ## Defects found by testing, and fixed
@@ -33,6 +33,12 @@
 | Browser test of the tour | Pressing Escape before the tour card had finished fading in did nothing (the key was only heard once focus was inside the card), so the tour stayed open and blocked the page | Escape is now heard from anywhere while the tour is open; the Tab and Shift+Tab loop goes round all its buttons |
 | Browser test, first run | The saved-picture test compared the picture with a screenshot that had the sticky top bar and a toast on top of the paper (a defect in the test) | The test hides those bars and takes its screenshot before saving; the difference is now under 8 of 255 |
 | API test while building reports | A cancelled order was counted in "orders today" in my own expectation; the code was right | Test expectation corrected |
+| The owner on the live site | The link in the confirmation email opened a 404 page (the API builds it on the web address, which only forwarded `/backend/*`) | `/v1/auth/*` is forwarded to the API too |
+| The owner on a phone | The order status on the customer's card did not move unless a rider was saved (the card followed a second, rider-only status) | One status: the order's; the card follows it with or without a rider |
+| The owner on a phone | Today's six tiles all opened the unfiltered order list | Each tile opens the orders it counts (`?view=`, `?status=`), with a chip to clear it |
+| The owner on a phone | Cash from a courier company, paid days later, could not be marked received; the cash button also needed a saved rider | Cash can be marked received on any cash-on-delivery order, and a "Cash to collect" list finds the ones still owing |
+| The owner on a phone | The saved invoice picture was soft (720 px wide) and its rounded header corners showed white | Drawn about 1,800 px wide with square corners; a test checks width and the top corners |
+| Running the server on UTC like Vercel | The rider photo time on the customer's card was 5 hours behind Pakistan time | The card formats times in Asia/Karachi; a test compares the shown time with the clock |
 
 ## Load test (API only)
 

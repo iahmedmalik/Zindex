@@ -4,8 +4,8 @@ import Link from "next/link";
 export const metadata: Metadata = { title: "How it's built", description: "The story, the stack and the tests behind Zindex." };
 
 // Real numbers only. Update these when the suites change (see docs/TEST-REPORT.md).
-const API_TESTS = 125;
-const BROWSER_TESTS = 42; // 21 tests, each in a desktop and a 375 px phone view
+const API_TESTS = 133;
+const BROWSER_TESTS = 54; // 27 tests, each in a desktop and a 375 px phone view
 const MIGRATIONS = 17;
 const REPO = "https://github.com/iahmedmalik/Zindex";
 
@@ -23,16 +23,18 @@ export default function HowItsBuilt() {
       <Link href="/" className="note" style={{ textDecoration: "none" }}>← Back to Zindex</Link>
       <header className="heading"><h1>How Zindex is built</h1><p className="note">For anyone curious about what is under the app.</p></header>
 
-      {/* Draft from verified facts (CV, project notes). Ahmed rewrites this in his own voice before release. */}
+      {/* Written in Ahmed's voice from the project's real history (29 Oct): only things that happened. */}
       <section className="section">
         <h2>Who built it</h2>
-        <p>I&apos;m Ahmed Malik, a computer science graduate from UET Lahore. I build software that real people use, and I design, code, test and ship it myself. Zindex is one of my portfolio projects.</p>
+        <p>Hi, I&apos;m Ahmed Malik. I studied computer science at UET Lahore, and I like building software for people who will use it on a busy day, not just for a demo. I designed, coded, tested and shipped Zindex myself, mostly on late nights. Its first user is my own brother.</p>
       </section>
 
       <section className="section">
         <h2>The story</h2>
-        <p>Zindex began with a small group of online shops in Lahore that sell mostly through WhatsApp. Orders arrive as chat messages, invoices were made in a separate tool, stock lived in someone&apos;s head, and customers kept asking &ldquo;who is the rider?&rdquo;.</p>
-        <p>I built one place for all of it: enter a chat order in about a minute, keep stock honest, send a proper invoice, and give the customer a link that shows their rider and exactly what to hand over at the door.</p>
+        <p>My brother runs a few online shops. Most of his orders don&apos;t come from a website: they arrive on WhatsApp, from customers and from people another customer told about him. Invoices were made in a separate tool, deliveries around town go with an inDrive or Yango rider booked by hand, and every customer asks the same thing once the order is on its way: &ldquo;who is the rider?&rdquo;.</p>
+        <p>So I built him one place for all of it. An order goes in from a phone, the invoice is made and numbered for him, stock goes down once, and the customer gets a link that shows how their order is doing and, when there is a rider, who is bringing it and exactly what to hand over at the door.</p>
+        <p>It got simpler as we used it. The buttons on the home screen open exactly the orders they count, cash that comes back from a courier days later can be ticked off, the invoice makes itself instead of waiting to be finalised, and a button my brother said they never use is gone.</p>
+        <p>One honest note: a shop this size could run on something much smaller. I built it with a proper API, a real database that keeps each owner&apos;s data separate, and a lot of tests on purpose, because I also wanted Zindex to show how I build things I would be comfortable leaving in someone&apos;s hands. It all runs on free plans.</p>
       </section>
 
       <section className="section">
