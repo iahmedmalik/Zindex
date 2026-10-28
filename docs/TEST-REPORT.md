@@ -11,6 +11,7 @@
 | Typecheck | web clean; API has one known error in `scripts/load-test.ts` (the load-test script, not the server or the tests) |
 | Production build (Next.js) | passes |
 | Dependency audit (`npm audit`) | 0 vulnerabilities |
+| Accessibility (axe-core, WCAG 2 A/AA including colour contrast), page overflow and touch-target size | 11 screens x laptop and 375 px x light and dark = 44 page views: **0 axe violations, 0 pages wider than the screen**. Two touch-size notes, both by design: a visually hidden radio behind a custom control, and the options inside a 46 px segmented control |
 | CI (GitHub Actions: typecheck, tests, build) | green on every API commit |
 
 ## Defects found by testing, and fixed
@@ -55,4 +56,4 @@ The delivery card stops at 120 requests a minute per address on purpose (the rat
 - **Saving to the phone gallery**: a web page cannot write to the gallery silently; the "Save to gallery" button opens the phone's share sheet. Tested as a downloaded picture; the share sheet itself needs the owner's real phone.
 - **Real phone**: the layout was tested at 375 px in a browser; the owner's own phone check is part of the release.
 - **Entry speed**: "a WhatsApp order in about a minute" has not been timed with the owner yet.
-- **Accessibility**: contrast was measured on every screen in light and dark; a screen-reader pass and a keyboard-only pass have not been done.
+- **Screen reader and keyboard-only pass**: not done by a person yet.
