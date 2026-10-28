@@ -60,11 +60,11 @@ test.describe("an order from WhatsApp to the door", () => {
     await page.getByRole("button", { name: "Finalise" }).click();
     await expect(page.getByText(/^SF-\d{4}$/)).toBeVisible();
     await page.getByRole("link", { name: /View, print or share the invoice/ }).click();
-    const doc = page.locator("article.doc");
+    const doc = page.locator("article.ivp");
     await expect(doc).toBeVisible();
-    await expect(doc).not.toHaveClass(/compact/);
-    await page.getByRole("radio", { name: "Compact" }).check({ force: true });
     await expect(doc).toHaveClass(/compact/);
+    await page.getByRole("radio", { name: "A4" }).check({ force: true });
+    await expect(doc).toHaveClass(/a4/);
   });
 
   test("@smoke the customer's delivery card needs no sign-in, shows the rider and what to pay, and a bad link says so", async ({ page, browser }) => {

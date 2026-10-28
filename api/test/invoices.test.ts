@@ -30,6 +30,7 @@ describe("invoices", () => {
     expect(draft.status).toBe(201);
     expect(draft.body.invoice).toMatchObject({ status: "draft", number: null });
     expect(draft.body.store).toMatchObject({ accent: "#5d1b23" });
+    expect(draft.body.store).toHaveProperty("email"); // shown on the invoice header
     expect(draft.body.order).toMatchObject({ total: 1000 });
 
     const final = await a.finalise(store, order);

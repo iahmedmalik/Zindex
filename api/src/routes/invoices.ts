@@ -29,7 +29,7 @@ async function loadInvoice(tx: Tx, storeId: string, orderId: string) {
   const [invoice] = await rows<Invoice>(tx, sql`select ${invoiceCols} from invoices where order_id = ${orderId} and store_id = ${storeId}`);
   if (!invoice) return undefined;
   const order = await loadOrder(tx, storeId, orderId);
-  const [store] = await rows(tx, sql`select name, phone, address, logo_url, accent from stores where id = ${storeId}`);
+  const [store] = await rows(tx, sql`select name, phone, email, address, logo_url, accent from stores where id = ${storeId}`);
   const edits = await rows(tx, sql`select id, changed, before, after, created_at from invoice_edits where invoice_id = ${invoice.id} order by created_at`);
   return { invoice, order, store, edits };
 }
