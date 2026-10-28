@@ -4,13 +4,15 @@
   "private": true,
   "description": "A back office for WhatsApp-driven shops: invoices, in-house stock and a delivery card for riders",
   "workspaces": [
-    "api"
+    "api",
+    "web"
   ],
   "scripts": {
     "dev:api": "npm run dev -w api",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
-    "build": "npm run build --workspaces --if-present"
+    "build": "npm run build --workspaces --if-present",
+    "dev:web": "npm run dev -w web"
   },
   "devDependencies": {
     "typescript": "^5.9.3"

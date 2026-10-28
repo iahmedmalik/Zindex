@@ -1,0 +1,29 @@
+import { pkr, stageLabel } from "@/lib/format";
+import type { Order, Store } from "@/lib/types";
+
+const n = (x: number) => x.toLocaleString("en-US");
+
+/**
+ * The Receipt: an order as a till slip. The stage is pressed onto it as a stamp; changing the stage
+ * remounts the stamp (the key), which plays the press again. It carries the store's own email, phone and
+ * address (set in the store's details), so what the owner sees is what a customer gets.
+ */
+export function Receipt({ order, store }: { order: Order; store?: Store }) {
+  const contact = [store?.email, store?.phone].filter(Boolean).join(" · ");
+  return (
+    <div className="slip" role="group" aria-label={`Receipt for order ${order.orderNo}`}>
+      <h4>{(store?.name ?? "Order").toUpperCase()}</h4>
+      {contact && <div className="mut">{contact}</div>}
+      <div className="mut">Order #{order.orderNo} · {new Date(order.createdAt).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</div>
+      <div style={{ height: 8 }} />
+      {order.items.map((i) => <div key={i.id} className="ln"><span>{i.name} × {i.quantity}</span><span className="num">{n(i.quantity * i.unitPrice)}</span></div>)}
+      {order.discount > 0 && <div className="ln"><span>Discount {order.discountPercent}%</span><span className="num">− {n(order.discount)}</span></div>}
+      {order.deliveryCharge > 0 && <div className="ln"><span>Delivery fee</span><span className="num">{n(order.deliveryCharge)}</span></div>}
+      <div className="ln tot"><span>TOTAL</span><span className="num">{n(order.total)}</span></div>
+      {order.riderFee > 0 && <div className="ln"><span>Rider fee (to the rider)</span><span className="num">+ {n(order.riderFee)}</span></div>}
+      {order.collectAtDoor > 0 && <div className="ln tot" style={{ borderTopStyle: "solid" }}><span>AT THE DOOR</span><span className="num">{pkr(order.collectAtDoor)}</span></div>}
+      {store?.address && <div className="ln mut contact"><span>{store.address}</span></div>}
+      <div key={order.status} className="stampmark hit" aria-hidden="true">{stageLabel[order.status].toUpperCase()}</div>
+    </div>
+  );
+}

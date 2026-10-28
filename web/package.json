@@ -1,0 +1,29 @@
+{
+  "name": "@zindex/web",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Zindex web app: orders, invoices, stock and delivery cards (Next.js, phone first)",
+  "scripts": {
+    "dev": "next dev -p 3500",
+    "build": "next build",
+    "start": "next start -p 3500",
+    "typecheck": "tsc --noEmit",
+    "test:e2e": "playwright test",
+    "test:smoke": "playwright test --grep @smoke"
+  },
+  "dependencies": {
+    "html-to-image": "^1.11.13",
+    "next": "^16.4.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.64.1",
+    "@types/node": "^22.19.0",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0"
+  },
+  "engines": {
+    "node": "22.x"
+  }
+}
