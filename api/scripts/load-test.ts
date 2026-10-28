@@ -8,6 +8,10 @@
 //
 // Never point it at production: it creates orders. Refuses anything that looks like a hosted API
 // unless LOAD_ALLOW_HOSTED=1 is set on purpose.
+
+// An (empty) export makes this file a module, so the top-level await below is valid for the type checker.
+export {};
+
 const API = process.env.LOAD_API ?? "http://127.0.0.1:4000";
 const ORIGIN = process.env.WEB_ORIGIN ?? "http://localhost:3500";
 const SECONDS = Number(process.env.LOAD_SECONDS ?? 10);
