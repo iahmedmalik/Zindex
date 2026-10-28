@@ -65,6 +65,15 @@ test.describe("receipt and delivery card", () => {
     await card.goto(path);
     const photo = card.locator("figure.photo img");
     await expect(photo).toBeVisible();
+    // The card is drawn on a server that may run in UTC (Vercel does); the time must still be Pakistan time.
+    const caption = await card.locator("figure.photo figcaption").innerText();
+    const shown = caption.match(/taken (\d{1,2}):(\d{2}) (am|pm)/i);
+    expect(shown, `no time in "${caption}"`).not.toBeNull();
+    const shownMinutes = ((Number(shown![1]) % 12) + (shown![3]!.toLowerCase() === "pm" ? 12 : 0)) * 60 + Number(shown![2]);
+    const parts = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Karachi", hour: "numeric", minute: "numeric", hour12: false }).formatToParts(new Date());
+    const nowMinutes = (Number(parts.find((p) => p.type === "hour")!.value) % 24) * 60 + Number(parts.find((p) => p.type === "minute")!.value);
+    const apart = Math.min((shownMinutes - nowMinutes + 1440) % 1440, (nowMinutes - shownMinutes + 1440) % 1440);
+    expect(apart, `the card said "${caption}" but it is ${nowMinutes} minutes into the day in Pakistan`).toBeLessThanOrEqual(3);
     await expect.poll(() => photo.evaluate((i) => (i as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
     const track = card.getByRole("link", { name: /Track delivery/ });
     await expect(track).toHaveAttribute("href", "https://indrive.example/trip/abc123");

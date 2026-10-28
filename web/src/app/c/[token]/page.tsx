@@ -51,13 +51,14 @@ export default async function CardPage({ params }: { params: Promise<{ token: st
   const { store, order, delivery } = card;
   const at = Math.max(0, steps.indexOf(order.status));
   const first = order.customerName.split(" ")[0];
-  const until = new Date(card.expiresAt).toLocaleDateString("en-GB", { day: "numeric", month: "long" });
+  // This page is drawn on a server that may run in UTC (Vercel does), so say Pakistan time on purpose.
+  const until = new Date(card.expiresAt).toLocaleDateString("en-GB", { day: "numeric", month: "long", timeZone: "Asia/Karachi" });
   const wa = store.phone ? `https://wa.me/${store.phone.replace(/\D/g, "").replace(/^0/, "92")}` : null;
   const cancelled = order.status === "cancelled" || order.status === "returned";
   const track = safeLink(delivery?.trackingUrl ?? null);
   const hasRider = !!delivery && (delivery.riderName || delivery.riderPhone);
   const photoSrc = delivery?.hasPhoto ? `/backend/v1/public/card/${encodeURIComponent(token)}/photo` : safeLink(delivery?.riderPhotoUrl ?? null);
-  const photoTime = delivery?.riderPhotoTakenAt ? new Date(delivery.riderPhotoTakenAt).toLocaleTimeString("en-GB", { hour: "numeric", minute: "2-digit", hour12: true }) : null;
+  const photoTime = delivery?.riderPhotoTakenAt ? new Date(delivery.riderPhotoTakenAt).toLocaleTimeString("en-GB", { hour: "numeric", minute: "2-digit", hour12: true, timeZone: "Asia/Karachi" }) : null;
 
   return (
     <div className="dcard" style={{ ["--store-base" as string]: store.accent }}>
