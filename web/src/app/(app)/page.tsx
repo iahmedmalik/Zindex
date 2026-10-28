@@ -91,14 +91,14 @@ export default function TodayPage() {
           <header><h2>{c.needsAction === 0 ? "All caught up" : `${c.needsAction} need${c.needsAction === 1 ? "s" : ""} you`}</h2><Link className="linkbtn" href="/orders">See all</Link></header>
           <div className="tiles">
             {[
-              { n: c.pending, t: "To confirm", icon: "check", hot: true },
-              { n: c.toPack, t: "To pack", icon: "stock" },
-              { n: c.awaitingRider, t: "Needs a rider", icon: "bike" },
-              { n: c.outForDelivery, t: "On the way", icon: "truck" },
-              { n: c.cashOutstanding, t: "Cash with riders", icon: "cash" },
-              { n: doneToday.length, t: "Delivered", icon: "check" },
+              { n: c.pending, t: "To confirm", icon: "check", hot: true, href: "/orders?status=pending" },
+              { n: c.toPack, t: "To pack", icon: "stock", href: "/orders?status=confirmed" },
+              { n: c.awaitingRider, t: "Needs a rider", icon: "bike", href: "/orders?view=needs_rider" },
+              { n: c.outForDelivery, t: "On the way", icon: "truck", href: "/orders?status=out_for_delivery" },
+              { n: c.cashOutstanding, t: "Cash to collect", icon: "cash", href: "/orders?view=cash" },
+              { n: doneToday.length, t: "Delivered", icon: "check", href: "/orders?view=delivered_today" },
             ].map((x, i) => (
-              <Link key={x.t} href="/orders" className={`tile arrive${x.hot && x.n > 0 ? " hot" : ""}${x.n === 0 ? " zero" : ""}`} style={{ ["--i" as string]: i }}>
+              <Link key={x.t} href={x.href} className={`tile arrive${x.hot && x.n > 0 ? " hot" : ""}${x.n === 0 ? " zero" : ""}`} style={{ ["--i" as string]: i }}>
                 <Icon name={x.icon} size={24} />
                 <span className="n"><Count value={x.n} /></span>
                 <span className="t">{x.t}</span>

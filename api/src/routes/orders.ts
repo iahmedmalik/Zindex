@@ -204,6 +204,9 @@ export function ordersRouter(db: Db): Router {
     const payment = typeof req.query.payment === "string" ? req.query.payment : "";
     if (payment && !["paid", "cod", "unpaid"].includes(payment)) throw new HttpError(400, "Unknown payment.");
     const method = typeof req.query.method === "string" ? req.query.method : "";
+    // The views the Today tiles open (same rules as the dashboard counts).
+    const view = typeof req.query.view === "string" ? req.query.view : "";
+    if (view && !["needs_rider", "cash", "delivered_today"].includes(view)) throw new HttpError(400, "Unknown view.");
     const list = await asOwner(db, req.user!.id, (tx) =>
       rows<Order>(
         tx,
@@ -212,6 +215,12 @@ export function ordersRouter(db: Db): Router {
               and (${status} = '' or o.status = ${status})
               and (${payment} = '' or o.payment = ${payment})
               and (${method} = '' or o.payment_method = ${method})
+              and (${view} <> 'needs_rider' or (o.status = 'packed' and o.delivery_kind = 'local'
+                   and not exists (select 1 from deliveries d where d.order_id = o.id and d.rider_name is not null)))
+              and (${view} <> 'cash' or (o.payment = 'cod' and o.cod_amount > 0 and o.status in ('out_for_delivery', 'delivered')
+                   and o.payment_confirmed_at is null))
+              and (${view} <> 'delivered_today' or (o.status = 'delivered'
+                   and (o.created_at at time zone 'Asia/Karachi')::date = (now() at time zone 'Asia/Karachi')::date))
               and (${q} = '' or o.customer_name ilike ${"%" + q + "%"}
                    or (${digits} <> '' and o.customer_phone like ${"%" + digits + "%"})
                    or o.order_no::text = ${q.replace(/^#/, "")})
