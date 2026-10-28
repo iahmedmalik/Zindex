@@ -1,23 +1,30 @@
 // Small moving graphics. Each one is plain SVG moved by CSS keyframes (no canvas, no 3D), so it stays
 // cheap on a phone. The motion rules live in globals.css; reduced motion stops them all.
 
-/** The road on Today: the van keeps driving to the house while the day's sales are shown above it. */
+/** The road on Today: the van keeps driving to the house while the day's sales are shown above it.
+ *  Drawn from separate pieces (not one stretched SVG), so the van and house keep their shape at any card width;
+ *  the van travels a share of the road's width (container units) instead of a fixed number of pixels. */
 export function Road() {
   return (
-    <svg className="road" viewBox="0 0 375 74" preserveAspectRatio="none" aria-hidden="true">
-      <g className="g-cloud"><ellipse cx="40" cy="14" rx="22" ry="7" fill="#fff" opacity=".12" /></g>
-      <g className="g-cloud" style={{ animationDelay: "-7s" }}><ellipse cx="40" cy="26" rx="16" ry="5" fill="#fff" opacity=".1" /></g>
-      <g className="g-house"><rect x="300" y="26" width="30" height="34" rx="4" fill="#e9b9bf" /><path d="M296 28l19-14 19 14z" fill="#fff" opacity=".9" /><rect x="310" y="44" width="9" height="16" rx="2" fill="#5d1b23" /></g>
-      <rect x="0" y="60" width="375" height="14" fill="#000" opacity=".19" />
-      <path className="g-lane" d="M0 67H375" stroke="#fff" strokeWidth="2" strokeDasharray="14 14" opacity=".55" />
-      <g className="g-van"><g className="g-drive">
-        <rect x="40" y="34" width="46" height="26" rx="6" fill="#fff" />
-        <path d="M86 42h16l8 12v6H86z" fill="#e9b9bf" />
-        <circle className="g-wheel" cx="56" cy="61" r="7" fill="#16100f" stroke="#fff" strokeWidth="2" />
-        <circle className="g-wheel" cx="98" cy="61" r="7" fill="#16100f" stroke="#fff" strokeWidth="2" />
-        <path d="M50 42h18M50 49h12" stroke="#5d1b23" strokeWidth="3" strokeLinecap="round" />
-      </g></g>
-    </svg>
+    <div className="road" aria-hidden="true">
+      <svg className="road-sky" width="100%" height="46">
+        <g className="g-cloud"><ellipse cx="40" cy="14" rx="22" ry="7" fill="#fff" opacity=".12" /></g>
+        <g className="g-cloud" style={{ animationDelay: "-7s" }}><ellipse cx="40" cy="28" rx="16" ry="5" fill="#fff" opacity=".1" /></g>
+      </svg>
+      <svg className="road-house g-house" width="44" height="48" viewBox="294 12 44 48">
+        <rect x="300" y="26" width="30" height="34" rx="4" fill="#e9b9bf" /><path d="M296 28l19-14 19 14z" fill="#fff" opacity=".9" /><rect x="310" y="44" width="9" height="16" rx="2" fill="#5d1b23" />
+      </svg>
+      <div className="road-ground"><i className="road-lane" /></div>
+      <div className="road-drive g-drive">
+        <svg className="g-van" width="78" height="42" viewBox="36 30 78 42">
+          <rect x="40" y="34" width="46" height="26" rx="6" fill="#fff" />
+          <path d="M86 42h16l8 12v6H86z" fill="#e9b9bf" />
+          <circle className="g-wheel" cx="56" cy="61" r="7" fill="#16100f" stroke="#fff" strokeWidth="2" />
+          <circle className="g-wheel" cx="98" cy="61" r="7" fill="#16100f" stroke="#fff" strokeWidth="2" />
+          <path d="M50 42h18M50 49h12" stroke="#5d1b23" strokeWidth="3" strokeLinecap="round" />
+        </svg>
+      </div>
+    </div>
   );
 }
 
@@ -57,12 +64,13 @@ export function Logo({ size = 40, draw = false, tone = "brand" }: { size?: numbe
   );
 }
 
-/** A faint dashed delivery curve with a start dot behind the app screens ("The trip"); decoration only. */
+/** A faint dotted delivery curve with a start dot behind the app screens ("The trip"); decoration only.
+ *  The strokes do not scale (vector-effect), so the dots stay small and fine on a wide laptop or a tall phone. */
 export function RouteBackdrop() {
   return (
     <svg className="backdrop" viewBox="0 0 300 140" preserveAspectRatio="xMidYMid slice" fill="none" aria-hidden="true">
-      <path d="M20 120C90 140 100 50 170 70S250 20 285 28" stroke="currentColor" strokeWidth="2.4" strokeDasharray="3 9" strokeLinecap="round" />
-      <circle cx="20" cy="120" r="6" fill="currentColor" />
+      <path d="M20 120C90 140 100 50 170 70S250 20 285 28" stroke="currentColor" strokeWidth="3" strokeDasharray="0.1 11" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+      <path d="M20 120h0.01" stroke="currentColor" strokeWidth="11" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
     </svg>
   );
 }
