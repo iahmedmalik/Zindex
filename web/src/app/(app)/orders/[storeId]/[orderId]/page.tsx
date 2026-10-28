@@ -96,6 +96,7 @@ export default function OrderPage() {
   const closed = order.status === "cancelled" || order.status === "returned";
   const step = next[order.status];
   const at = stepOf[order.status];
+  const cashDue = order.payment === "cod" && order.codAmount > 0 && order.status === "delivered" && !order.paymentConfirmedAt;
 
   return (
     <div className="stack store-scope" style={{ gap: 28, ["--store-base" as string]: store?.accent }}>
@@ -279,7 +280,13 @@ export default function OrderPage() {
             <button className="btn quiet" disabled={busy} onClick={() => { if (confirm(`Cancel order #${order.orderNo}? Stock that was taken out stays out until you put it back.`)) void move("cancelled").catch(() => undefined); }}>Cancel</button>
           )}
           {step ? <button className="btn grow" disabled={busy} onClick={() => void move(step.to).catch(() => undefined)}>{step.label}</button>
-            : order.status === "delivered" ? <button className="btn quiet grow" disabled={busy} onClick={() => { if (confirm("Mark this order as returned?")) void move("returned").catch(() => undefined); }}>Mark returned</button> : null}
+            : order.status === "delivered" ? (
+              <>
+                {/* A delivered cash-on-delivery order is not finished until the cash is in: that is the main step until then. */}
+                <button className="btn quiet grow" style={cashDue ? { flex: "0 0 auto" } : undefined} disabled={busy} onClick={() => { if (confirm("Mark this order as returned?")) void move("returned").catch(() => undefined); }}>Mark returned</button>
+                {cashDue && <button className="btn grow" disabled={busy} onClick={() => run(async () => { await api(`${base}/payment/cash-handover`, { method: "POST" }); return "Cash received · order settled"; }).catch(() => undefined)}><Icon name="cash" size={18} />Got the cash</button>}
+              </>
+            ) : null}
         </div>
       )}
     </div>

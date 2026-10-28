@@ -123,6 +123,20 @@ test.describe("an order from WhatsApp to the door", () => {
     await expect(page.getByText(/cash received/)).toBeVisible();
     await expect(page.locator("a.row", { hasText: name })).toHaveCount(0);
   });
+
+  test("the main button becomes Got the cash once a COD order is delivered, and goes back when the cash is in", async ({ page }) => {
+    await createOrder(page, { name: "Main Cash", rider: "300" });
+    await moveTo(page, ["Confirm order", "Mark packed", "Out for delivery"]);
+    await expect(page.getByRole("button", { name: /Got the cash/ })).toHaveCount(0); // not delivered yet: the main step is Mark delivered
+    await moveTo(page, ["Mark delivered"]);
+    const cash = page.getByRole("button", { name: "Got the cash", exact: true });
+    await expect(cash).toBeVisible();
+    await expect(page.getByRole("button", { name: "Mark returned" })).toBeVisible(); // still there, as the quiet button
+    await cash.click();
+    await expect(page.getByText("Cash received", { exact: true })).toBeVisible();
+    await expect(cash).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Mark returned" })).toBeVisible();
+  });
 });
 
 test.describe("layout, motion and looks", () => {
