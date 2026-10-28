@@ -20,10 +20,9 @@ const next: Partial<Record<Stage, { to: Stage; label: string }>> = {
   out_for_delivery: { to: "delivered", label: "Mark delivered" },
 };
 const templates = [["order_confirmed", "Order confirmed"], ["invoice", "Invoice"], ["rider_assigned", "Rider assigned"], ["on_the_way", "On the way"], ["delivered", "Delivered"], ["payment_reminder", "Payment reminder"], ["thank_you", "Thank you"]] as const;
-const shipStatuses = [["shipped", "Shipped"], ["delayed", "Delayed"], ["delivered", "Delivered"], ["returned", "Returned"], ["failed", "Failed"]] as const;
 
 type DeliveryState = { delivery: Delivery | null };
-type Shipment = { courier: string; trackingNo: string | null; trackingUrl: string | null; shippedOn: string | null; status: string; failureReason: string | null };
+type Shipment = { courier: string; trackingNo: string | null; trackingUrl: string | null; shippedOn: string | null };
 const wa = (phone: string | null) => (phone ? `https://wa.me/${phone.replace(/^0/, "92")}` : null);
 const orNull = (v: string) => (v.trim() ? v.trim() : null);
 
@@ -39,7 +38,9 @@ export default function OrderPage() {
   const [ship, setShip] = useState<Shipment | null>(null);
   const [rider, setRider] = useState({ service: "yango", riderName: "", riderPhone: "", bikeNumber: "", trackingUrl: "" });
   const [parcel, setParcel] = useState({ courier: "", trackingNo: "", trackingUrl: "" });
-  const [reason, setReason] = useState("");
+  const [addingCourier, setAddingCourier] = useState(false); // like the rider: the fields stay closed until "Add a courier" (or "Edit")
+  const addingCourierRef = useRef(false);
+  useEffect(() => { addingCourierRef.current = addingCourier; }, [addingCourier]);
   const [adding, setAdding] = useState(false); // the rider fields are closed until "Add a rider" (or "Edit") is pressed
   const addingRef = useRef(false);
   useEffect(() => { addingRef.current = adding; }, [adding]);
@@ -63,7 +64,7 @@ export default function OrderPage() {
       if (o.deliveryKind === "courier") {
         const s = await api<{ shipment: Shipment | null }>(`${base}/shipment`);
         setShip(s.shipment);
-        if (s.shipment) setParcel({ courier: s.shipment.courier, trackingNo: s.shipment.trackingNo ?? "", trackingUrl: s.shipment.trackingUrl ?? "" });
+        if (s.shipment && !addingCourierRef.current) setParcel({ courier: s.shipment.courier, trackingNo: s.shipment.trackingNo ?? "", trackingUrl: s.shipment.trackingUrl ?? "" });
       }
     } catch (err) {
       setError(messageOf(err));
@@ -171,34 +172,39 @@ export default function OrderPage() {
 
           {order.deliveryKind === "courier" && order.status !== "cancelled" && (
             <section className="section">
-              <header><h2>Courier</h2>{ship ? <span className={`badge ${ship.status === "failed" || ship.status === "returned" ? "bad" : ship.status === "delivered" ? "ok" : ""}`}>{ship.status}</span> : <span className="badge warn">Not shipped</span>}</header>
-              <div className="grid2">
-                <label className="field"><span>Courier</span><input className="input" list="couriers" value={parcel.courier} onChange={(e) => setParcel({ ...parcel, courier: e.target.value })} placeholder="TCS, Leopards…" /></label>
-                <label className="field"><span>Tracking number</span><input className="input num" value={parcel.trackingNo} onChange={(e) => setParcel({ ...parcel, trackingNo: e.target.value })} /></label>
-              </div>
-              <datalist id="couriers"><option value="TCS" /><option value="Leopards" /><option value="M&P" /><option value="Trax" /><option value="Call Courier" /><option value="BlueEx" /></datalist>
-              <label className="field"><span>Tracking link (optional)</span><input className="input" value={parcel.trackingUrl} onChange={(e) => setParcel({ ...parcel, trackingUrl: e.target.value })} placeholder="https://" /></label>
-              <div className="inline">
-                <DoneButton done="Saved" disabled={busy || !parcel.courier.trim()} onClick={() => run(async () => {
-                  await api(`${base}/shipment`, { method: "PUT", body: { courier: parcel.courier.trim(), trackingNo: orNull(parcel.trackingNo), trackingUrl: orNull(parcel.trackingUrl) } });
-                })}>{ship ? "Save changes" : "Mark shipped"}</DoneButton>
-                {ship?.trackingUrl && <a className="btn quiet" href={ship.trackingUrl} target="_blank" rel="noopener"><Icon name="truck" size={18} />Track</a>}
-              </div>
-              {ship && (
-                <div className="stack">
-                  <div className="chips" role="group" aria-label="Parcel status">
-                    {shipStatuses.filter(([s]) => s !== ship.status).map(([s, label]) => (
-                      <button key={s} className="chip" disabled={busy || ((s === "failed" || s === "returned") && !reason.trim())} onClick={() => run(async () => {
-                        await api(`${base}/shipment/status`, { method: "POST", body: { status: s, ...(s === "failed" || s === "returned" ? { failureReason: reason.trim() } : {}) } });
-                        setReason("");
-                        return `Parcel marked ${label.toLowerCase()}`;
-                      })}>{label}</button>
-                    ))}
-                  </div>
-                  <label className="field"><span>Reason (needed for failed or returned)</span><input className="input" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Customer not answering" /></label>
-                  {ship.failureReason && <p className="note">Last reason: {ship.failureReason}</p>}
+              <header><h2>Courier</h2>{ship && <span className="badge ok">{ship.courier}</span>}</header>
+              {!addingCourier && (
+                <div className="photo-row">
+                  <span className="photo-ic" aria-hidden="true"><Icon name="truck" size={22} /></span>
+                  {ship ? (
+                    <>
+                      <span className="grow"><b>{ship.courier}</b><br /><span className="note">{ship.trackingNo ? `Tracking ${ship.trackingNo}` : "No tracking number yet"}</span></span>
+                      {ship.trackingUrl && <a className="btn small quiet" href={ship.trackingUrl} target="_blank" rel="noopener">Track</a>}
+                      <button className="btn small quiet" aria-expanded={false} onClick={() => setAddingCourier(true)}>Edit</button>
+                    </>
+                  ) : (
+                    <>
+                      <span className="grow"><b>No courier added</b><br /><span className="note">Optional. Add the courier and tracking number when you hand the parcel over.</span></span>
+                      <button className="btn small quiet" aria-expanded={false} onClick={() => setAddingCourier(true)}><Icon name="plus" size={16} />Add a courier</button>
+                    </>
+                  )}
                 </div>
               )}
+              <div className={`expand${addingCourier ? " open" : ""}`}><div className="stack" style={{ gap: 14 }}>
+                <div className="grid2">
+                  <label className="field"><span>Courier</span><input className="input" list="couriers" value={parcel.courier} onChange={(e) => setParcel({ ...parcel, courier: e.target.value })} placeholder="TCS, Leopards…" /></label>
+                  <label className="field"><span>Tracking number</span><input className="input num" value={parcel.trackingNo} onChange={(e) => setParcel({ ...parcel, trackingNo: e.target.value })} /></label>
+                </div>
+                <datalist id="couriers"><option value="TCS" /><option value="Leopards" /><option value="M&P" /><option value="Trax" /><option value="Call Courier" /><option value="BlueEx" /></datalist>
+                <label className="field"><span>Tracking link (optional)</span><input className="input" value={parcel.trackingUrl} onChange={(e) => setParcel({ ...parcel, trackingUrl: e.target.value })} placeholder="https://" /></label>
+                <div className="inline">
+                  <DoneButton done="Courier saved" disabled={busy || !parcel.courier.trim()} onClick={() => run(async () => {
+                    await api(`${base}/shipment`, { method: "PUT", body: { courier: parcel.courier.trim(), trackingNo: orNull(parcel.trackingNo), trackingUrl: orNull(parcel.trackingUrl) } });
+                    setAddingCourier(false);
+                  })}>Save courier</DoneButton>
+                  <button className="btn quiet" disabled={busy} onClick={() => { setAddingCourier(false); void load(); }}>Cancel</button>
+                </div>
+              </div></div>
             </section>
           )}
 

@@ -14,12 +14,13 @@ const api = (cookie: string) => {
     save: (s: string, o: string, body: object) => call("put", `/v1/stores/${s}/orders/${o}/shipment`, body),
     get: (s: string, o: string) => call("get", `/v1/stores/${s}/orders/${o}/shipment`),
     status: (s: string, o: string, body: object) => call("post", `/v1/stores/${s}/orders/${o}/shipment/status`, body),
+    orderStatus: (s: string, o: string, status: string) => call("post", `/v1/stores/${s}/orders/${o}/status`, { status }),
     list: (s: string, q = "") => call("get", `/v1/stores/${s}/shipments${q}`),
   };
 };
 
 describe("courier shipments", () => {
-  it("records a parcel by hand, edits it and keeps a status history", async () => {
+  it("records a parcel by hand and edits it, with no status of its own", async () => {
     const o = await newVerifiedOwner(t.app, t.mailer);
     const a = api(o.cookie);
     const store = await a.store();
@@ -28,14 +29,17 @@ describe("courier shipments", () => {
 
     const saved = await a.save(store, order, { courier: "TCS", trackingNo: "77881234", trackingUrl: "https://www.tcsexpress.com/track/77881234", shippedOn: "2026-10-28" });
     expect(saved.status).toBe(200);
-    expect(saved.body.shipment).toMatchObject({ courier: "TCS", trackingNo: "77881234", shippedOn: "2026-10-28", status: "shipped" });
+    expect(saved.body.shipment).toMatchObject({ courier: "TCS", trackingNo: "77881234", shippedOn: "2026-10-28" });
+    // The order's own status is the only status: a parcel has none, and no way to be given one.
+    expect(saved.body.shipment).not.toHaveProperty("status");
+    expect(saved.body.shipment).not.toHaveProperty("failureReason");
+    expect(saved.body).not.toHaveProperty("events");
+    expect((await a.status(store, order, { status: "delayed" })).status).toBe(404);
 
     expect((await a.save(store, order, { trackingNo: "77881235" })).body.shipment).toMatchObject({ courier: "TCS", trackingNo: "77881235" });
-    await a.status(store, order, { status: "delayed" });
-    const failed = await a.status(store, order, { status: "failed", failureReason: "Customer not answering" });
-    expect(failed.body.shipment).toMatchObject({ status: "failed", failureReason: "Customer not answering" });
-    expect(failed.body.events.map((e: { status: string }) => e.status)).toEqual(["shipped", "delayed", "failed"]);
-    expect((await a.list(store, "?status=failed")).body.shipments[0]).toMatchObject({ customerName: "Hira", trackingNo: "77881235" });
+    await a.orderStatus(store, order, "confirmed");
+    expect((await a.list(store)).body.shipments[0]).toMatchObject({ customerName: "Hira", trackingNo: "77881235", orderStatus: "confirmed" }); // the list shows the order's stage
+    expect((await a.list(store, "?status=failed")).body.shipments).toHaveLength(1); // the old filter is simply ignored
   });
 
   it("never makes two shipments for one order or reuses a tracking number", async () => {
@@ -50,7 +54,7 @@ describe("courier shipments", () => {
     expect((await a.save(store, two, { courier: "leopards", trackingNo: "LP1" })).status).toBe(409);
   });
 
-  it("refuses non-courier orders, missing courier names, bad links and repeated statuses", async () => {
+  it("refuses non-courier orders, missing courier names and bad links", async () => {
     const o = await newVerifiedOwner(t.app, t.mailer);
     const a = api(o.cookie);
     const store = await a.store();
@@ -58,10 +62,6 @@ describe("courier shipments", () => {
     const order = await a.order(store);
     expect((await a.save(store, order, { trackingNo: "X1" })).status).toBe(400);
     expect((await a.save(store, order, { courier: "TCS", trackingUrl: "http://insecure" })).status).toBe(400);
-    expect((await a.status(store, order, { status: "delivered" })).status).toBe(404);
-    await a.save(store, order, { courier: "TCS" });
-    expect((await a.status(store, order, { status: "shipped" })).status).toBe(409);
-    expect((await a.status(store, order, { status: "delivered", failureReason: "x" })).status).toBe(400);
   });
 
   it("is private to the owner", async () => {

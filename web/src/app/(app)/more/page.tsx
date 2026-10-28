@@ -8,7 +8,7 @@ import { useSession } from "@/lib/session";
 
 const links = [
   { href: "/customers", icon: "users", title: "Customers", sub: "Saved from orders, per store" },
-  { href: "/shipments", icon: "truck", title: "Courier parcels", sub: "Tracking numbers and problems" },
+  { href: "/shipments", icon: "truck", title: "Courier parcels", sub: "Tracking numbers" },
   { href: "/reports", icon: "chart", title: "Reports", sub: "Sales, cash and stock, with Excel files" },
   { href: "/settings", icon: "store", title: "Stores and settings", sub: "Stores, Shopify, messages, look, backup" },
   { href: "/how-its-built", icon: "code", title: "How it's built", sub: "The story, the stack and the tests" },

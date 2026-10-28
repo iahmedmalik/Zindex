@@ -26,7 +26,7 @@ On a laptop the same app has a side menu and a second column, and the invoice co
 - **The delivery card.** A link for the customer: status, rider name, bike number, a call button, and the exact amount to have ready. In the store's own colour. It expires and can be switched off; only a hash of the link is stored.
 - **Cash on delivery tracking.** Mark advance payments received and COD cash handed over; see what is still with riders.
 - **WhatsApp, free.** Seven editable message templates per store and `wa.me` links. No Business API.
-- **Courier parcels** recorded by hand with tracking and failure reasons.
+- **Courier parcels**: add the courier and tracking number only when you want them. A parcel has no status of its own; the order's one status is moved by the main button.
 - **Reports** for any dates, per store or together, with Excel files; stock reports; a full backup download.
 - **Shopify**: import the orders export as pending orders with their invoices (importing twice adds nothing) and sync products (names, prices, pictures; never stock).
 - **Try the demo.** One tap on the sign-in page opens a preloaded demo shop (three stores, orders in every stage, an invoice, a rider and a delivery card) with a short guided tour. It resets every day and has guard rails (no backups, no Shopify, small caps).

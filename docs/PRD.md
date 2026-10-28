@@ -25,7 +25,7 @@ One owner login per account in v1. No staff roles. Open sign-up is deliberately 
 | Orders | One-page phone form: customer by phone (saved and reused), items from the catalogue or typed, percent discount, rider fee or courier fee, payment (paid in advance, cash on delivery, pay later), notes. Seven stages. A retried save never makes a second order. |
 | Invoices | Made with the order and numbered at once with the store's next gap-free number (a cancelled order keeps its number). Edits are logged once the order is out for delivery. A4 or compact receipt, print or PDF, image to share. |
 | Products and stock | A catalogue and price per store. In-house stock as an append-only ledger: one deduction when the order is confirmed, put back only when the owner approves, warnings at zero but sales never blocked. |
-| Delivery | Optional rider details (name, phone, bike, photo, tracking link); a public delivery card link; manual courier parcel records with tracking and failure reasons. |
+| Delivery | Optional rider details (name, phone, bike, photo, tracking link); a public delivery card link; an optional courier (name, tracking number and link) recorded by hand. The order has one status, moved by the main button; a parcel has none of its own. |
 | Money | The owner marks advance payments received and COD cash handed over; a cash-with-riders summary. |
 | Messages | Seven editable WhatsApp templates per store and `wa.me` links. |
 | Insight | Dashboard of what needs action today; sales and stock reports with Excel files; complete backup download. |

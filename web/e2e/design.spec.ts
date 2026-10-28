@@ -124,6 +124,23 @@ test.describe("receipt and delivery card", () => {
     await expect(page.getByRole("button", { name: "Confirm order", exact: true })).toBeVisible();
   });
 
+  test("a courier order stays simple until a courier is added, and the courier has no status of its own", async ({ page }) => {
+    await createOrder(page, { name: "Courier Simple", kind: "Courier" });
+    await expect(page.getByLabel("Tracking number")).toBeHidden(); // closed until "Add a courier"
+    await expect(page.getByRole("button", { name: "Add a courier" })).toBeVisible();
+    await page.getByRole("button", { name: "Add a courier" }).click();
+    await page.getByLabel("Courier", { exact: true }).fill("TCS");
+    await page.getByLabel("Tracking number").fill(`TN${Date.now()}`); // desktop and phone runs share one database
+    await page.getByRole("button", { name: "Save courier" }).click();
+    await expect(page.getByLabel("Tracking number")).toBeHidden(); // closed again after saving
+    await expect(page.getByText(/^Tracking TN\d+/)).toBeVisible(); // the short summary
+    await expect(page.getByRole("button", { name: "Edit" })).toBeVisible();
+    // The order's main button is the only thing that moves it: no courier status buttons, no reason field.
+    for (const name of [/^Shipped$/, /^Delayed$/, /^Failed$/, /^Returned$/, /Mark shipped/]) await expect(page.getByRole("button", { name })).toHaveCount(0);
+    await expect(page.getByLabel(/Reason/)).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Confirm order", exact: true })).toBeVisible();
+  });
+
   test("a tracking link that is not https is refused with a clear message", async ({ page }) => {
     await createOrder(page, { name: "Bad Link Buyer", rider: "300" });
     await addRider(page, { name: "Imran", tracking: "http://indrive.example/trip/1" });

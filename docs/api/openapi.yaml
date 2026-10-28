@@ -143,14 +143,11 @@ paths:
     put: { tags: [Delivery], summary: Save the rider by hand (only the fields sent change), responses: { "200": { description: OK }, "409": { description: Only local orders have a rider } } }
   /v1/stores/{storeId}/orders/{orderId}/shipment:
     parameters: [{ $ref: "#/components/parameters/storeId" }, { $ref: "#/components/parameters/orderId" }]
-    get: { tags: [Delivery], summary: The courier parcel, responses: { "200": { description: OK } } }
+    get: { tags: [Delivery], summary: The courier parcel (courier, tracking number and link, date; no status of its own: the order's status is the only one), responses: { "200": { description: OK } } }
     put: { tags: [Delivery], summary: Record or edit the parcel by hand (no courier integration), responses: { "200": { description: OK }, "409": { description: Duplicate tracking number or not a courier order } } }
-  /v1/stores/{storeId}/orders/{orderId}/shipment/status:
-    parameters: [{ $ref: "#/components/parameters/storeId" }, { $ref: "#/components/parameters/orderId" }]
-    post: { tags: [Delivery], summary: "shipped, delayed, delivered, returned, failed (a reason for failed or returned)", responses: { "200": { description: OK } } }
   /v1/stores/{storeId}/shipments:
     parameters: [{ $ref: "#/components/parameters/storeId" }]
-    get: { tags: [Delivery], summary: "The store's parcels (?status=)", responses: { "200": { description: OK } } }
+    get: { tags: [Delivery], summary: "The store's parcels, newest first, each with its order's stage", responses: { "200": { description: OK } } }
   /v1/stores/{storeId}/orders/{orderId}/card:
     parameters: [{ $ref: "#/components/parameters/storeId" }, { $ref: "#/components/parameters/orderId" }]
     get: { tags: [Delivery], summary: "The order's live delivery card link ({ card: { url, expiresAt } | null }). It is made by itself when the order is confirmed. The token is derived from the server secret and the order, so it can be shown again; only its hash is stored.", responses: { "200": { description: "{ card }" } } }

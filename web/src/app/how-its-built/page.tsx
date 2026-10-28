@@ -5,7 +5,7 @@ export const metadata: Metadata = { title: "How it's built", description: "The s
 
 // Real numbers only. Update these when the suites change (see docs/TEST-REPORT.md).
 const API_TESTS = 133;
-const BROWSER_TESTS = 54; // 27 tests, each in a desktop and a 375 px phone view
+const BROWSER_TESTS = 58; // 29 tests, each in a desktop and a 375 px phone view
 const MIGRATIONS = 17;
 const REPO = "https://github.com/iahmedmalik/Zindex";
 

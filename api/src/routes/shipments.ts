@@ -8,8 +8,6 @@ import { validateBody } from "../validate";
 import { idParam, storeIdOf } from "./ids";
 import { loadOrder } from "./orders";
 
-const statuses = ["shipped", "delivered", "delayed", "returned", "failed"] as const;
-
 const putBody = z
   .object({
     courier: z.string().trim().min(1).max(40),
@@ -19,18 +17,14 @@ const putBody = z
   })
   .partial()
   .strict();
-const statusBody = z
-  .object({ status: z.enum(statuses), failureReason: z.string().trim().min(1).max(200).optional() })
-  .strict()
-  .refine((b) => (b.status === "failed" || b.status === "returned" ? true : b.failureReason === undefined), "a reason is only for a failed or returned parcel");
-
-type Shipment = { id: string; orderId: string; courier: string; trackingNo: string | null; trackingUrl: string | null; shippedOn: string | null; status: (typeof statuses)[number]; failureReason: string | null };
-const cols = sql`id, order_id, courier, tracking_no, tracking_url, to_char(shipped_on, 'YYYY-MM-DD') as shipped_on, status, failure_reason`;
+// A parcel is only who carries it and how to follow it. It has no status of its own: the order's progress is the
+// order's status (orders.ts), moved by the main button and nothing else.
+type Shipment = { id: string; orderId: string; courier: string; trackingNo: string | null; trackingUrl: string | null; shippedOn: string | null };
+const cols = sql`id, order_id, courier, tracking_no, tracking_url, to_char(shipped_on, 'YYYY-MM-DD') as shipped_on`;
 
 async function load(tx: Tx, orderId: string) {
   const [shipment] = await rows<Shipment>(tx, sql`select ${cols} from shipments where order_id = ${orderId}`);
-  const events = shipment ? await rows(tx, sql`select status, note, created_at from shipment_events where shipment_id = ${shipment.id} order by created_at, id`) : [];
-  return { shipment: shipment ?? null, events };
+  return { shipment: shipment ?? null };
 }
 
 // Mounted at /v1/stores/:storeId/orders/:orderId/shipment
@@ -64,8 +58,6 @@ export function shipmentRouter(db: Db): Router {
                 values (${storeId}, ${orderId}, ${b.courier}, ${b.trackingNo ?? null}, ${b.trackingUrl ?? null}, coalesce(${b.shippedOn ?? null}::date, current_date))
                 on conflict (order_id) do nothing`,
           );
-          const [{ id }] = (await rows<{ id: string }>(tx, sql`select id from shipments where order_id = ${orderId}`)) as [{ id: string }];
-          await tx.execute(sql`insert into shipment_events (shipment_id, status) values (${id}, 'shipped')`);
         } else {
           const has = (k: keyof typeof b) => k in b;
           await tx.execute(
@@ -87,35 +79,20 @@ export function shipmentRouter(db: Db): Router {
     }
   });
 
-  router.post("/status", validateBody(statusBody), async (req, res) => {
-    const b = req.body as z.infer<typeof statusBody>;
-    const result = await inOrder(req, async (tx, orderId) => {
-      const { shipment } = await load(tx, orderId);
-      if (!shipment) throw new HttpError(404, "Save the shipment first.");
-      if (shipment.status === b.status) throw new HttpError(409, `The parcel is already ${b.status}.`);
-      await tx.execute(sql`update shipments set status = ${b.status}, failure_reason = ${b.failureReason ?? null}, updated_at = now() where id = ${shipment.id}`);
-      await tx.execute(sql`insert into shipment_events (shipment_id, status, note) values (${shipment.id}, ${b.status}, ${b.failureReason ?? null})`);
-      return load(tx, orderId);
-    });
-    res.json(result);
-  });
-
   return router;
 }
 
-// Mounted at /v1/stores/:storeId/shipments — the store's parcels, newest first, optionally by status.
+// Mounted at /v1/stores/:storeId/shipments — the store's parcels, newest first, each with its order's stage.
 export function shipmentsListRouter(db: Db): Router {
   const router = Router({ mergeParams: true });
   router.get("/", async (req, res) => {
-    const status = typeof req.query.status === "string" ? req.query.status : "";
-    if (status && !(statuses as readonly string[]).includes(status)) throw new HttpError(400, "Unknown status.");
     const list = await asOwner(db, req.user!.id, (tx) =>
       rows(
         tx,
-        sql`select s.id, s.order_id, s.courier, s.tracking_no, s.tracking_url, to_char(s.shipped_on, 'YYYY-MM-DD') as shipped_on, s.status, s.failure_reason,
-                   o.order_no, o.customer_name, o.cod_amount
+        sql`select s.id, s.order_id, s.courier, s.tracking_no, s.tracking_url, to_char(s.shipped_on, 'YYYY-MM-DD') as shipped_on,
+                   o.order_no, o.customer_name, o.cod_amount, o.status as order_status
               from shipments s join orders o on o.id = s.order_id
-             where s.store_id = ${storeIdOf(req)} and (${status} = '' or s.status = ${status})
+             where s.store_id = ${storeIdOf(req)}
              order by s.created_at desc limit 200`,
       ),
     );
