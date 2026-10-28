@@ -17,6 +17,8 @@ const api = (cookie: string) => {
     confirm: (s: string, o: string) => call("post", `/v1/stores/${s}/orders/${o}/payment/confirm`),
     handover: (s: string, o: string) => call("post", `/v1/stores/${s}/orders/${o}/payment/cash-handover`),
     undo: (s: string, o: string) => call("delete", `/v1/stores/${s}/orders/${o}/payment`),
+    list: (s: string, query: string) => call("get", `/v1/stores/${s}/orders${query}`),
+    board: () => call("get", "/v1/dashboard"),
     summary: (s: string) => call("get", `/v1/stores/${s}/cod-summary`),
   };
 };
@@ -61,12 +63,59 @@ describe("payments and COD cash", () => {
     expect((await a.summary(store)).body.outstanding).toBe(2000);
   });
 
-  it("needs a rider before a handover, and a COD order", async () => {
+  it("marks cash received without a rider being saved, and only for a COD order", async () => {
     const o = await newVerifiedOwner(t.app, t.mailer);
     const a = api(o.cookie);
     const store = await a.store();
-    expect((await a.handover(store, await a.order(store))).status).toBe(409);
+    const order = await a.order(store);
+    await sendOut(a, store, order); // no rider details saved at all
+    const done = await a.handover(store, order);
+    expect(done.status).toBe(200);
+    expect(done.body.order.paymentConfirmedAt).toBeTruthy();
     expect((await a.handover(store, await a.order(store, { payment: "paid" }))).status).toBe(409);
+  });
+
+  it("collects COD cash from a courier days later: it stays findable until marked, then drops off", async () => {
+    const o = await newVerifiedOwner(t.app, t.mailer);
+    const a = api(o.cookie);
+    const store = await a.store();
+    const parcel = await a.order(store, { deliveryKind: "courier", riderFee: 0, deliveryCharge: 200 });
+    await sendOut(a, store, parcel);
+    await a.status(store, parcel, "delivered");
+
+    // delivered, but the courier company has not paid yet
+    const waiting = (await a.list(store, "?view=cash")).body.orders;
+    expect(waiting.map((x: { id: string }) => x.id)).toEqual([parcel]);
+    expect((await a.board()).body.totals.cashOutstanding).toBe(1);
+    expect((await a.summary(store)).body).toMatchObject({ expected: 1200, collected: 0, outstanding: 1200 });
+
+    expect((await a.handover(store, parcel)).body.order.paymentConfirmedAt).toBeTruthy();
+    expect((await a.list(store, "?view=cash")).body.orders).toHaveLength(0);
+    expect((await a.board()).body.totals.cashOutstanding).toBe(0);
+    expect((await a.summary(store)).body).toMatchObject({ collected: 1200, outstanding: 0 });
+
+    await a.undo(store, parcel);
+    expect((await a.list(store, "?view=cash")).body.orders).toHaveLength(1);
+  });
+
+  it("filters the order list by the views the Today tiles open", async () => {
+    const o = await newVerifiedOwner(t.app, t.mailer);
+    const a = api(o.cookie);
+    const store = await a.store();
+    const idsOf = async (query: string) => ((await a.list(store, query)).body.orders as { id: string }[]).map((x) => x.id).sort();
+
+    const noRider = await a.order(store);
+    const withRider = await a.order(store);
+    await a.rider(store, withRider);
+    for (const id of [noRider, withRider]) for (const s of ["confirmed", "packed"]) await a.status(store, id, s);
+    const delivered = await a.order(store, { payment: "paid" });
+    await sendOut(a, store, delivered);
+    await a.status(store, delivered, "delivered");
+
+    expect(await idsOf("?view=needs_rider")).toEqual([noRider]);
+    expect(await idsOf("?view=delivered_today")).toEqual([delivered]);
+    expect(await idsOf("?view=cash")).toEqual([]); // nothing out for delivery with cash owed yet
+    expect((await a.list(store, "?view=nonsense")).status).toBe(400);
   });
 
   it("is private to the owner", async () => {

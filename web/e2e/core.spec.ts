@@ -92,15 +92,37 @@ test.describe("an order from WhatsApp to the door", () => {
     await customer.close();
   });
 
-  test("a cash-on-delivery order is settled when the rider hands over the cash", async ({ page }) => {
+  const moveTo = async (page: import("@playwright/test").Page, buttons: string[]) => {
+    for (const b of buttons) {
+      await page.getByRole("button", { name: b, exact: true }).click();
+      await expect(page.getByText(/#\d+ is /)).toBeVisible();
+    }
+  };
+
+  test("a cash-on-delivery order is settled when the rider hands over the cash, even with no rider saved", async ({ page }) => {
     await createOrder(page, { name: "Cash Buyer", rider: "300" });
-    await page.getByLabel("Rider name").fill("Imran");
-    await page.getByRole("button", { name: "Save rider" }).click();
-    await expect(page.getByText("Imran · Yango")).toBeVisible();
+    // nothing to collect before the order leaves
+    await expect(page.getByRole("button", { name: "Rider handed over the cash" })).toHaveCount(0);
+    await moveTo(page, ["Confirm order", "Mark packed", "Out for delivery"]);
     await page.getByRole("button", { name: "Rider handed over the cash" }).click();
-    await expect(page.getByText("Cash handed over")).toBeVisible();
+    await expect(page.getByText("Cash received", { exact: true })).toBeVisible();
     await page.getByRole("button", { name: "Undo" }).click();
     await expect(page.getByRole("button", { name: "Rider handed over the cash" })).toBeVisible();
+  });
+
+  test("@smoke cash from a courier company, days later: Today's tile finds the order and it is marked received", async ({ page }) => {
+    const name = `Courier Cash ${Date.now() % 1000000}`;
+    await createOrder(page, { name, kind: "Courier" });
+    await moveTo(page, ["Confirm order", "Mark packed", "Out for delivery", "Mark delivered"]);
+    await page.getByRole("link", { name: "Today" }).first().click();
+    await page.getByRole("link", { name: /Cash to collect/ }).first().click();
+    await expect(page).toHaveURL(/\/orders\?view=cash/);
+    await expect(page.getByRole("button", { name: /Cash to collect: show all orders again/ })).toBeVisible();
+    const row = page.locator("a.row", { hasText: name });
+    await expect(row).toContainText("courier");
+    await row.getByRole("button", { name: "Got the cash" }).click();
+    await expect(page.getByText(/cash received/)).toBeVisible();
+    await expect(page.locator("a.row", { hasText: name })).toHaveCount(0);
   });
 });
 

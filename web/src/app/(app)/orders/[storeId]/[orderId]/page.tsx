@@ -213,9 +213,9 @@ export default function OrderPage() {
               {!closed && order.payment === "paid" && (order.paymentConfirmedAt
                 ? <span className="inline"><span className="badge ok">Payment received</span><button className="linkbtn" onClick={() => run(async () => { await api(`${base}/payment`, { method: "DELETE" }); return "Payment marked not received"; })}>Undo</button></span>
                 : <button className="btn small quiet" disabled={busy} onClick={() => run(async () => { await api(`${base}/payment/confirm`, { method: "POST" }); return "Payment marked received"; })}>I can see the payment</button>)}
-              {!closed && order.payment === "cod" && order.deliveryKind === "local" && del?.delivery && (del.delivery.cashHandedOver
-                ? <span className="inline"><span className="badge ok">Cash handed over</span><button className="linkbtn" onClick={() => run(async () => { await api(`${base}/payment`, { method: "DELETE" }); return "Handover undone"; })}>Undo</button></span>
-                : <button className="btn small quiet" disabled={busy} onClick={() => run(async () => { await api(`${base}/payment/cash-handover`, { method: "POST" }); return "Cash handed over · order settled"; })}><Icon name="cash" size={18} />Rider handed over the cash</button>)}
+              {!closed && order.payment === "cod" && order.codAmount > 0 && (order.status === "out_for_delivery" || order.status === "delivered") && (order.paymentConfirmedAt
+                ? <span className="inline"><span className="badge ok">Cash received</span><button className="linkbtn" onClick={() => run(async () => { await api(`${base}/payment`, { method: "DELETE" }); return "Cash marked not received"; })}>Undo</button></span>
+                : <button className="btn small quiet" disabled={busy} onClick={() => run(async () => { await api(`${base}/payment/cash-handover`, { method: "POST" }); return "Cash received · order settled"; })}><Icon name="cash" size={18} />{order.deliveryKind === "courier" ? "Courier paid the cash" : order.deliveryKind === "pickup" ? "Cash received" : "Rider handed over the cash"}</button>)}
             </div>
           </section>
 

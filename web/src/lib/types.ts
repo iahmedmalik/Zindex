@@ -53,7 +53,6 @@ export type Delivery = {
   riderScreenshotUrl: string | null;
   pickupAddress: string | null;
   notes: string | null;
-  cashHandedOver: boolean;
 };
 
 export type Board = {

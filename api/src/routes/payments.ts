@@ -32,13 +32,12 @@ export function paymentsRouter(db: Db): Router {
     res.json({ order });
   });
 
-  // The rider gave the store the COD cash. Settles the order's payment as well.
+  // The COD cash reached the store: from the rider on the day, or from the courier company days later. It does not
+  // matter whether a rider was ever saved. The order's payment_confirmed_at is the one record of "the money is in".
   router.post("/orders/:orderId/payment/cash-handover", async (req, res) => {
     const order = await inOrder(req, async (tx, o) => {
-      if (o.payment !== "cod") throw new HttpError(409, "Only a cash-on-delivery order has cash to hand over.");
-      const [d] = await rows<{ id: string }>(tx, sql`select id from deliveries where order_id = ${o.id}`);
-      if (!d) throw new HttpError(409, "Save the rider details first.");
-      await tx.execute(sql`update deliveries set cash_handed_over = true, cash_handed_at = coalesce(cash_handed_at, now()), updated_at = now() where id = ${d.id}`);
+      if (o.payment !== "cod") throw new HttpError(409, "Only a cash-on-delivery order has cash to collect.");
+      if (o.status === "cancelled") throw new HttpError(409, "A cancelled order has no cash to collect.");
       await tx.execute(sql`update orders set payment_confirmed_at = coalesce(payment_confirmed_at, now()) where id = ${o.id}`);
     });
     res.json({ order });
@@ -48,18 +47,17 @@ export function paymentsRouter(db: Db): Router {
   router.delete("/orders/:orderId/payment", async (req, res) => {
     const order = await inOrder(req, async (tx, o) => {
       await tx.execute(sql`update orders set payment_confirmed_at = null where id = ${o.id}`);
-      await tx.execute(sql`update deliveries set cash_handed_over = false, cash_handed_at = null, updated_at = now() where order_id = ${o.id}`);
     });
     res.json({ order });
   });
 
-  // Cash the riders still owe the store: COD orders that are out for delivery or delivered but not handed over.
+  // Cash still to collect: COD orders that are out for delivery or delivered, from riders and from couriers, and not yet received.
   router.get("/cod-summary", async (req, res) => {
     const storeId = storeIdOf(req);
     const result = await asOwner(db, req.user!.id, async (tx) => {
-      const list = await rows<{ id: string; orderNo: number; customerName: string; codAmount: number; riderName: string | null; status: string; handedOver: boolean }>(
+      const list = await rows<{ id: string; orderNo: number; customerName: string; codAmount: number; riderName: string | null; deliveryKind: string; status: string; handedOver: boolean }>(
         tx,
-        sql`select o.id, o.order_no, o.customer_name, o.cod_amount, d.rider_name, o.status, coalesce(d.cash_handed_over, false) as handed_over
+        sql`select o.id, o.order_no, o.customer_name, o.cod_amount, d.rider_name, o.delivery_kind, o.status, o.payment_confirmed_at is not null as handed_over
               from orders o left join deliveries d on d.order_id = o.id
              where o.store_id = ${storeId} and o.payment = 'cod' and o.cod_amount > 0 and o.status in ('out_for_delivery', 'delivered')
              order by o.created_at desc limit 200`,

@@ -66,7 +66,7 @@ export default function ReportsPage() {
                 <li><span>Courier delivery fees</span><span className="lead" /><span className="num">{t.deliveryFees.toLocaleString("en-US")}</span></li>
                 {t.returnedValue > 0 && <li className="aside"><span>Returned</span><span className="lead" /><span className="num">− {t.returnedValue.toLocaleString("en-US")}</span></li>}
                 <li className="total"><span>Net sales</span><span className="lead" /><span className="num">{pkr(t.netSales)}</span></li>
-                <li><span>Cash handed over by riders</span><span className="lead" /><span className="num">{t.codCollected.toLocaleString("en-US")}</span></li>
+                <li><span>Cash received from riders and couriers</span><span className="lead" /><span className="num">{t.codCollected.toLocaleString("en-US")}</span></li>
                 <li><span>Advance payments received</span><span className="lead" /><span className="num">{t.onlineReceived.toLocaleString("en-US")}</span></li>
                 <li className="aside"><span>Rider fees (went to riders, not sales)</span><span className="lead" /><span className="num">{t.riderFeesPassedOn.toLocaleString("en-US")}</span></li>
                 <li><span>Cost of goods (estimate)</span><span className="lead" /><span className="num">{t.costOfGoods.toLocaleString("en-US")}</span></li>

@@ -172,13 +172,13 @@ export default function TodayPage() {
       <aside className="side">
         {cod && (
           <section className="well">
-            <h2>Cash with riders</h2>
+            <h2>Cash to collect</h2>
             <ul className="ledger">
               <li><span>Expected</span><span className="lead" /><span className="num">PKR <Count value={cod.expected} money /></span></li>
-              <li><span>Handed over</span><span className="lead" /><span className="num">PKR <Count value={cod.collected} money /></span></li>
-              <li className="total"><span>Still with riders</span><span className="lead" /><span className="num">PKR <Count value={cod.outstanding} money /></span></li>
+              <li><span>Received</span><span className="lead" /><span className="num">PKR <Count value={cod.collected} money /></span></li>
+              <li className="total"><span>Still to collect</span><span className="lead" /><span className="num">PKR <Count value={cod.outstanding} money /></span></li>
             </ul>
-            <p className="note">Counts cash-on-delivery orders that are out or delivered. Mark the handover on each order.</p>
+            <p className="note">Cash-on-delivery orders that are out or delivered and not paid to you yet, from riders and from couriers. <Link href="/orders?view=cash">See these orders</Link> and mark each one when the cash arrives.</p>
           </section>
         )}
         {!storeId && board.stores.length > 1 && (

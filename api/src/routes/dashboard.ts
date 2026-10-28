@@ -8,7 +8,7 @@ import { rows } from "../db/query";
 //   pending          -> confirm it
 //   toPack           -> confirmed, not packed yet
 //   awaitingRider    -> packed local delivery with no rider added yet
-//   cashOutstanding  -> COD cash a rider has not handed over
+//   cashOutstanding  -> COD cash not received yet (from a rider or a courier company)
 type Counts = {
   storeId: string;
   name: string;
@@ -40,7 +40,7 @@ export function dashboardRouter(db: Db): Router {
               count(o.id) filter (where o.status = 'delivered')::int as delivered,
               count(o.id) filter (where o.status = 'returned')::int as problems,
               count(o.id) filter (where o.payment = 'cod' and o.cod_amount > 0 and o.status in ('out_for_delivery', 'delivered')
-                                    and not coalesce(d.cash_handed_over, false))::int as cash_outstanding,
+                                    and o.payment_confirmed_at is null)::int as cash_outstanding,
               count(o.id) filter (where (o.created_at at time zone 'Asia/Karachi')::date = (now() at time zone 'Asia/Karachi')::date
                                     and o.status <> 'cancelled')::int as orders_today,
               coalesce(sum(o.total) filter (where (o.created_at at time zone 'Asia/Karachi')::date = (now() at time zone 'Asia/Karachi')::date

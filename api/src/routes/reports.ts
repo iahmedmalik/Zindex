@@ -48,7 +48,7 @@ export function reportsRouter(db: Db): Router {
                    coalesce(sum(o.delivery_charge), 0)::int as delivery_fees,
                    coalesce(sum(o.total) filter (where o.status <> 'returned'), 0)::int as net_sales,
                    coalesce(sum(o.total) filter (where o.status = 'returned'), 0)::int as returned_value,
-                   coalesce(sum(o.cod_amount) filter (where o.payment = 'cod' and d.cash_handed_over), 0)::int as cod_collected,
+                   coalesce(sum(o.cod_amount) filter (where o.payment = 'cod' and o.payment_confirmed_at is not null), 0)::int as cod_collected,
                    coalesce(sum(o.total) filter (where o.payment = 'paid' and o.payment_confirmed_at is not null), 0)::int as online_received,
                    coalesce(sum(o.rider_fee), 0)::int as rider_fees_passed_on,
                    coalesce((select sum(i.quantity * coalesce(p.cost, 0)) from order_items i join orders o2 on o2.id = i.order_id
