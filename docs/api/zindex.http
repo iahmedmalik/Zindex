@@ -30,6 +30,24 @@ Content-Type: application/json
 
 { "name": "Sheen Food", "invoicePrefix": "SF", "accent": "#8a3b12", "phone": "0300 1112223" }
 
+### A store's logo and watermark (one small picture each; the app shrinks it first)
+PUT {{api}}/v1/stores/{{store}}/images/logo
+Content-Type: image/png
+
+< ./sample-logo.png
+
+###
+GET {{api}}/v1/stores/{{store}}/images/logo
+
+###
+DELETE {{api}}/v1/stores/{{store}}/images/watermark
+
+###
+PATCH {{api}}/v1/stores/{{store}}
+Content-Type: application/json
+
+{ "watermarkOn": false }
+
 ### Products (a separate catalogue and price per store)
 GET {{api}}/v1/stores/{{store}}/products?q=masala
 

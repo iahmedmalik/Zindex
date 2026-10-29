@@ -21,7 +21,7 @@ One owner login per account in v1. No staff roles. Open sign-up is deliberately 
 
 | Area | What the owner can do |
 |---|---|
-| Accounts and stores | Sign in with a confirmed email; run several stores; each has its own invoice letters, numbering, colour, phone and address. |
+| Accounts and stores | Sign in with a confirmed email; run several stores; each has its own invoice letters, numbering, colour, phone, address, logo and watermark (shown on the invoice, the receipt and the customer's card; the watermark can be switched off). |
 | Orders | One-page phone form: customer by phone (saved and reused), items from the catalogue or typed, percent discount, rider fee or courier fee, payment (paid in advance, cash on delivery, pay later), notes. Seven stages. A retried save never makes a second order. |
 | Invoices | Made with the order and numbered at once with the store's next gap-free number (a cancelled order keeps its number). Edits are logged once the order is out for delivery. A4 or compact receipt, print or PDF, image to share. |
 | Products and stock | A catalogue and price per store. In-house stock as an append-only ledger: one deduction when the order is confirmed, put back only when the owner approves, warnings at zero but sales never blocked. |

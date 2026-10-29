@@ -67,6 +67,11 @@ paths:
     parameters: [{ $ref: "#/components/parameters/storeId" }]
     patch: { tags: [Stores], summary: Edit a store, requestBody: { content: { application/json: { schema: { $ref: "#/components/schemas/StoreInput" } } } }, responses: { "200": { description: OK }, "404": { $ref: "#/components/responses/NotFound" } } }
     delete: { tags: [Stores], summary: Delete a store and everything in it, responses: { "204": { description: Deleted }, "404": { $ref: "#/components/responses/NotFound" } } }
+  /v1/stores/{storeId}/images/{kind}:
+    parameters: [{ $ref: "#/components/parameters/storeId" }, { name: kind, in: path, required: true, schema: { type: string, enum: [logo, watermark] } }]
+    put: { tags: [Stores], summary: "Save the store's logo or watermark: one PNG, JPEG or WebP up to 300 KB, sent as the raw body. It shows on the invoice, the receipt and the customer's card (the watermark only while watermarkOn is true).", responses: { "200": { description: "The store, with logoUrl and watermarkUrl" }, "400": { description: Not a PNG, JPEG or WebP }, "413": { description: Too big }, "404": { $ref: "#/components/responses/NotFound" } } }
+    get: { tags: [Stores], summary: The picture itself (the owner only), responses: { "200": { description: The image }, "404": { $ref: "#/components/responses/NotFound" } } }
+    delete: { tags: [Stores], summary: Remove the picture, responses: { "200": { description: The store }, "404": { $ref: "#/components/responses/NotFound" } } }
   /v1/stores/{storeId}/products:
     parameters: [{ $ref: "#/components/parameters/storeId" }]
     get: { tags: [Catalogue], summary: "Search the store's products (?q=)", responses: { "200": { description: OK } } }
@@ -239,7 +244,7 @@ components:
     Stage: { enum: [pending, confirmed, packed, out_for_delivery, delivered, returned, cancelled] }
     StoreInput:
       type: object
-      properties: { name: { type: string }, phone: { type: string }, address: { type: string }, accent: { type: string, pattern: "^#[0-9a-fA-F]{6}$" }, invoicePrefix: { type: string, pattern: "^[A-Z0-9]{1,8}$" } }
+      properties: { name: { type: string }, phone: { type: string }, address: { type: string }, accent: { type: string, pattern: "^#[0-9a-fA-F]{6}$" }, invoicePrefix: { type: string, pattern: "^[A-Z0-9]{1,8}$" }, watermarkOn: { type: boolean, description: "PATCH only: show the watermark on invoices" } }
     OrderInput:
       type: object
       required: [customerName, items]
