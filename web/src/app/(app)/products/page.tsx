@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Count, Icon, useToast } from "@/components/ui";
+import { Count, Icon, useConfirm, useToast } from "@/components/ui";
 import { api, messageOf } from "@/lib/api";
 import { pkr, when } from "@/lib/format";
 import { useSession } from "@/lib/session";
@@ -14,6 +14,7 @@ type Move = { id: string; delta: number; reason: string; note: string | null; or
 export default function StockPage() {
   const { stores, storeId, select } = useSession();
   const toast = useToast();
+  const confirmCard = useConfirm();
   const [rows, setRows] = useState<StockRow[] | null>(null);
   const [q, setQ] = useState("");
   const [adding, setAdding] = useState(false);
@@ -127,7 +128,7 @@ export default function StockPage() {
                     </ul>
                   )}
                   <button className="btn danger" style={{ justifySelf: "start" }} onClick={async () => {
-                    if (!confirm(`Delete ${r.name}? It leaves your catalogue and Stock. Orders already made keep their lines, so sales, profit and invoices do not change. This product's stock history is deleted with it.`)) return;
+                    if (!(await confirmCard({ title: `Delete ${r.name}?`, body: <><p>It leaves your catalogue and Stock. Orders already made keep their lines, so sales, profit and invoices do not change.</p><p>This product&apos;s stock history is deleted with it.</p></>, confirm: "Delete product", danger: true })).ok) return;
                     try { await api(`/stores/${storeId}/products/${r.productId}`, { method: "DELETE" }); toast(`${r.name} deleted`); setOpen(null); await load(); } catch (err) { toast(messageOf(err), "bad"); }
                   }}>Delete product</button>
                 </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 
 // Shared parts of the Zindex look: icons, the journey line, segmented controls, a counting number,
 // toasts. Every one of them moves with the motion tokens in globals.css.
@@ -140,5 +141,75 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       {children}
       <div className={`toast${show ? " show" : ""}${msg?.tone === "bad" ? " bad" : ""}`} role={msg?.tone === "bad" ? "alert" : "status"} aria-live="polite">{msg?.text}</div>
     </ToastCtx.Provider>
+  );
+}
+
+/**
+ * A card over the page: it rises from the bottom on a phone and sits in the middle on a laptop, with the page blurred
+ * behind it. It stays mounted for a moment after closing so it can leave with the same easing it arrived with.
+ */
+export function Dialog({ open, onClose, label, children }: { open: boolean; onClose: () => void; label: string; children: ReactNode }) {
+  const [mounted, setMounted] = useState(open);
+  const [on, setOn] = useState(false);
+  const card = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (open) {
+      setMounted(true);
+      const frame = requestAnimationFrame(() => requestAnimationFrame(() => setOn(true)));
+      return () => cancelAnimationFrame(frame);
+    }
+    setOn(false);
+    const gone = setTimeout(() => setMounted(false), 220);
+    return () => clearTimeout(gone);
+  }, [open]);
+  useEffect(() => {
+    if (!on) return;
+    card.current?.querySelector<HTMLElement>("[data-first]")?.focus();
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [on, onClose]);
+  if (!mounted) return null;
+  return createPortal(
+    <div className={`dlg-scrim${on ? " on" : ""}`} onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="dlg" role="dialog" aria-modal="true" aria-label={label} ref={card}>{children}</div>
+    </div>,
+    document.body,
+  );
+}
+
+export type ConfirmOptions = { title: string; body?: ReactNode; confirm: string; danger?: boolean; tick?: { label: string; checked: boolean } };
+type Asked = ConfirmOptions & { resolve: (r: { ok: boolean; ticked: boolean }) => void };
+const ConfirmCtx = createContext<(o: ConfirmOptions) => Promise<{ ok: boolean; ticked: boolean }>>(async () => ({ ok: false, ticked: false }));
+/** `const { ok, ticked } = await confirm({ title, body, confirm: "Delete" })`: the app's own confirm card, not the browser's box. */
+export const useConfirm = () => useContext(ConfirmCtx);
+export function ConfirmProvider({ children }: { children: ReactNode }) {
+  const [asked, setAsked] = useState<Asked | null>(null);
+  const [open, setOpen] = useState(false);
+  const [ticked, setTicked] = useState(false);
+  const confirm = useCallback((o: ConfirmOptions) => new Promise<{ ok: boolean; ticked: boolean }>((resolve) => {
+    setAsked({ ...o, resolve });
+    setTicked(o.tick?.checked ?? false);
+    setOpen(true);
+  }), []);
+  const answer = (ok: boolean) => { setOpen(false); asked?.resolve({ ok, ticked }); };
+  return (
+    <ConfirmCtx.Provider value={confirm}>
+      {children}
+      <Dialog open={open} onClose={() => answer(false)} label={asked?.title ?? "Confirm"}>
+        <h2>{asked?.title}</h2>
+        {asked?.body && <div className="note stack" style={{ gap: 8 }}>{asked.body}</div>}
+        {asked?.tick && (
+          <label className="inline" style={{ gap: 10 }}>
+            <input type="checkbox" checked={ticked} onChange={(e) => setTicked(e.target.checked)} />
+            <span>{asked.tick.label}</span>
+          </label>
+        )}
+        <div className="dlg-actions">
+          <button type="button" className="btn quiet" data-first onClick={() => answer(false)}>Keep it</button>
+          <button type="button" className={`btn${asked?.danger ? " danger-solid" : ""}`} onClick={() => answer(true)}>{asked?.confirm}</button>
+        </div>
+      </Dialog>
+    </ConfirmCtx.Provider>
   );
 }

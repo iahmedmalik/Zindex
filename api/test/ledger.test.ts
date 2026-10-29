@@ -123,7 +123,7 @@ describe("paid in advance and the one-tap buttons", () => {
 });
 
 describe("rules around payments", () => {
-  it("an order with a payment cannot change its amounts or be deleted until the payments are undone", async () => {
+  it("an order with a payment cannot change its amounts until the payments are undone", async () => {
     const o = await newVerifiedOwner(t.app, t.mailer);
     const a = api(o.cookie);
     const store = await a.store();
@@ -131,10 +131,6 @@ describe("rules around payments", () => {
     await a.pay(store, order, { amount: 100 });
     expect((await a.edit(store, order, { discountPercent: 10 })).body.error).toMatch(/Undo them first/);
     expect((await a.edit(store, order, { notes: "just a note" })).status).toBe(200); // details that are not amounts are fine
-    const check = (await request(t.app).get(`/v1/stores/${store}/orders/${order}`).set("Cookie", o.cookie)).body.deletable;
-    expect(check).toMatchObject({ ok: false });
-    expect(check.reason).toMatch(/Undo the recorded payments/);
-    expect((await a.del(store, order)).status).toBe(409);
   });
 
   it("is private to the owner, and refuses a bad amount or a future date", async () => {

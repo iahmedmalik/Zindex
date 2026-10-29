@@ -184,27 +184,30 @@ async function writeItems(tx: Tx, orderId: string, items: Resolved[]) {
   }
 }
 
-type Deletable = { ok: boolean; reason: string | null; invoiceSeq: number | null };
+/** What deleting an order will take with it, shown on the confirm card. */
+type DeleteInfo = { stockOut: boolean; payments: number; invoiceNumber: string | null; numberComesBack: boolean };
 
 /**
- * An order may be deleted only while nothing has really happened to it: pending, or cancelled with its stock back, and
- * no payment recorded. And only if its invoice is the store's latest number, so giving the number back leaves no gap.
- * Anything else is cancelled instead: a cancelled order keeps its invoice number as a void.
+ * Any order can be deleted, at any stage (the owner's call). Its invoice, items, payments, delivery link and parcel go with
+ * it. If its invoice is the store's latest number the number is given back, so no gap appears; an older number stays
+ * missing, and the confirm card says so. Cancel is still there for an order that should stay on record as void.
  */
-async function checkDeletable(tx: Tx, storeId: string, o: Order): Promise<Deletable> {
-  const no = (reason: string): Deletable => ({ ok: false, reason, invoiceSeq: null });
-  if (o.status !== "pending" && o.status !== "cancelled") return no("Only a pending or cancelled order can be deleted. Cancel it first, or keep it as a record.");
-  if (o.stockApplied) return no("Put the stock back first, then delete it.");
-  if (o.paid > 0) return no("Undo the recorded payments first, then delete it.");
+async function deleteInfo(tx: Tx, storeId: string, o: Order): Promise<DeleteInfo & { invoiceSeq: number | null }> {
   const [inv] = await rows<{ number: string | null }>(tx, sql`select number from invoices where order_id = ${o.id}`);
-  if (!inv?.number) return { ok: true, reason: null, invoiceSeq: null };
-  const seq = Number(inv.number.split("-").pop());
   const [st] = await rows<{ nextInvoiceNo: number }>(tx, sql`select next_invoice_no from stores where id = ${storeId}`);
-  if (!Number.isInteger(seq) || !st || seq !== st.nextInvoiceNo - 1) {
-    return no(`Invoice ${inv.number} is not the store's latest, so deleting it would leave a gap in the numbers. Cancel the order instead: it keeps its number.`);
-  }
-  return { ok: true, reason: null, invoiceSeq: seq };
+  const seq = inv?.number ? Number(inv.number.split("-").pop()) : NaN;
+  const latest = Number.isInteger(seq) && !!st && seq === st.nextInvoiceNo - 1;
+  const [net] = await rows<{ net: number }>(tx, sql`select coalesce(sum(delta), 0)::int as net from stock_movements where order_id = ${o.id}`);
+  return {
+    stockOut: (net?.net ?? 0) < 0,
+    payments: o.paid,
+    invoiceNumber: inv?.number ?? null,
+    numberComesBack: latest,
+    invoiceSeq: latest ? seq : null,
+  };
 }
+
+const deleteBody = z.object({ restoreStock: z.boolean().optional() }).strict();
 
 export type NewOrder = Omit<z.infer<typeof createBody>, "source" | "idempotencyKey"> & { source?: "whatsapp" | "manual" | "shopify"; externalRef?: string | null };
 
@@ -277,30 +280,39 @@ export function ordersRouter(db: Db, config: Config): Router {
   router.get("/:id", async (req, res) => {
     const found = await asOwner(db, req.user!.id, async (tx) => {
       const order = await loadOrder(tx, storeIdOf(req), idParam(req, "id", "Order"));
-      return order ? { order, deletable: await checkDeletable(tx, storeIdOf(req), order) } : null;
+      return order ? { order, onDelete: await deleteInfo(tx, storeIdOf(req), order) } : null;
     });
     if (!found) throw new HttpError(404, "Order not found.");
-    res.json({ order: found.order, deletable: { ok: found.deletable.ok, reason: found.deletable.reason } });
+    const { invoiceSeq: _seq, ...onDelete } = found.onDelete;
+    res.json({ order: found.order, onDelete });
   });
 
-  // Deleting is strict, so the books stay honest: see checkDeletable. The order's invoice, items, delivery, card links
-  // and parcel go with it, and the invoice number is given back (it was the latest, so no gap appears).
-  router.delete("/:id", async (req, res) => {
+  // The order, its invoice, items, payments, delivery link and parcel go. Stock it took out is put back unless the owner
+  // says the goods really are gone (restoreStock: false): then the ledger keeps the loss as an adjustment, so the stock
+  // level does not change. The invoice number is given back when it was the latest.
+  router.delete("/:id", (req, _res, next) => { req.body ??= {}; next(); }, validateBody(deleteBody), async (req, res) => {
     const storeId = storeIdOf(req);
     const id = idParam(req, "id", "Order");
+    const { restoreStock = true } = req.body as z.infer<typeof deleteBody>;
     const result = await asOwner(db, req.user!.id, async (tx) => {
       const order = await loadOrder(tx, storeId, id);
       if (!order) throw new HttpError(404, "Order not found.");
-      const check = await checkDeletable(tx, storeId, order);
-      if (!check.ok) throw new HttpError(409, check.reason!);
-      await tx.execute(sql`delete from orders where id = ${id}`);
+      const info = await deleteInfo(tx, storeId, order);
+      if (info.stockOut && !restoreStock) {
+        await tx.execute(
+          sql`insert into stock_movements (store_id, product_id, delta, reason, note)
+              select ${storeId}, product_id, sum(delta)::int, 'adjustment', ${`Order #${order.orderNo} deleted, stock not put back`}
+                from stock_movements where order_id = ${id} group by product_id having sum(delta) <> 0`,
+        );
+      }
+      await tx.execute(sql`delete from orders where id = ${id}`); // the order's own stock rows go with it: that is what puts the stock back
       let released = false;
-      if (check.invoiceSeq !== null) {
-        const [r] = await rows<{ ok: boolean }>(tx, sql`select release_invoice_number(${storeId}::uuid, ${check.invoiceSeq}::int) as ok`);
+      if (info.invoiceSeq !== null) {
+        const [r] = await rows<{ ok: boolean }>(tx, sql`select release_invoice_number(${storeId}::uuid, ${info.invoiceSeq}::int) as ok`);
         if (!r?.ok) throw new HttpError(409, "Another order was made at the same moment, so its invoice number could not be given back. Nothing was deleted. Try again.");
         released = true;
       }
-      return { deleted: true, invoiceNumberReleased: released };
+      return { deleted: true, invoiceNumberReleased: released, stockPutBack: info.stockOut && restoreStock };
     });
     res.json(result);
   });

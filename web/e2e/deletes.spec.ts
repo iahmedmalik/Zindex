@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { createOrder, freshPhone, openStock, signIn } from "./helpers";
 
-// Deleting a product keeps every past number; deleting an order is strict (pending or cancelled, latest invoice number).
+// Deleting a product keeps every past number; an order can be deleted at any stage, after the in-app confirm card.
 // Names are unique because the desktop and phone runs share one database.
 
 test.describe("deleting", () => {
@@ -29,8 +29,10 @@ test.describe("deleting", () => {
     // delete it
     await openStock(page);
     await page.getByRole("button", { name: new RegExp(name) }).first().click();
-    page.once("dialog", (d) => { expect(d.message()).toMatch(/sales, profit and invoices do not change/); void d.accept(); });
     await page.getByRole("button", { name: "Delete product" }).click();
+    const card = page.getByRole("dialog");
+    await expect(card).toContainText(/sales, profit and invoices do not change/);
+    await card.getByRole("button", { name: "Delete product" }).click();
     await expect(page.getByText(`${name} deleted`)).toBeVisible();
     await expect(page.getByRole("button", { name: new RegExp(name) })).toHaveCount(0);
 
@@ -39,25 +41,30 @@ test.describe("deleting", () => {
     await expect(page.getByRole("group", { name: /Receipt for order/ })).toContainText(name);
   });
 
-  test("a pending order with the store's latest invoice can be deleted, and it is gone from the list", async ({ page }) => {
+  test("an order can be deleted, and it is gone from the list", async ({ page }) => {
     const buyer = `Delete Buyer ${Date.now() % 1000000}`;
     await createOrder(page, { name: buyer });
     await expect(page.getByRole("heading", { name: "Delete this order" })).toBeVisible();
-    page.once("dialog", (d) => { void d.accept(); });
     await page.getByRole("button", { name: "Delete order" }).click();
+    const card = page.getByRole("dialog");
+    await expect(card).toContainText(/invoice, and its delivery link|its invoice and its delivery link/);
+    await card.getByRole("button", { name: "Delete order" }).click();
     await expect(page).toHaveURL(/\/orders$/);
     await expect(page.getByText(/Order #\d+ deleted/)).toBeVisible();
     await expect(page.locator("a.row", { hasText: buyer })).toHaveCount(0);
   });
 
-  test("an older order cannot be deleted: the page says why, and Cancel is the way", async ({ page }) => {
+  test("keeping it closes the card and changes nothing; an older order can be deleted too, and the card says its number stays missing", async ({ page }) => {
     await createOrder(page, { name: `Older Order ${Date.now() % 1000000}` });
     const olderUrl = page.url();
     await createOrder(page, { name: `Newer Order ${Date.now() % 1000000}` });
     await page.goto(olderUrl);
-    await expect(page.getByText(/is not the store's latest/)).toBeVisible();
-    await expect(page.getByRole("button", { name: "Delete order" })).toBeDisabled();
-    await expect(page.getByRole("button", { name: "Cancel", exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "Delete order" }).click();
+    const card = page.getByRole("dialog");
+    await expect(card).toContainText(/will stay missing from your numbers/);
+    await card.getByRole("button", { name: "Keep it" }).click();
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await expect(page).toHaveURL(olderUrl);
   });
 
   test("a price edited on an order line says it is for this order only", async ({ page }) => {

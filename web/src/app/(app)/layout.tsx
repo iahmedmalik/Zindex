@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Logo, RouteBackdrop } from "@/components/graphics";
 import { Tour } from "@/components/Tour";
-import { Icon, ToastProvider } from "@/components/ui";
+import { ConfirmProvider, Icon, ToastProvider } from "@/components/ui";
 import { apply, load } from "@/lib/appearance";
 import { api } from "@/lib/api";
 import { SessionProvider, useSession } from "@/lib/session";
@@ -136,7 +136,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <SessionProvider>
       <ToastProvider>
-        <Chrome>{children}</Chrome>
+        <ConfirmProvider>
+          <Chrome>{children}</Chrome>
+        </ConfirmProvider>
       </ToastProvider>
     </SessionProvider>
   );

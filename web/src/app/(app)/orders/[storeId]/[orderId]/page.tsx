@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { PaymentsBox } from "@/components/payments-box";
 import { Receipt } from "@/components/receipt";
-import { DoneButton, Icon, Journey, Seg, useToast } from "@/components/ui";
+import { DoneButton, Icon, Journey, Seg, useConfirm, useToast } from "@/components/ui";
 import { api, messageOf } from "@/lib/api";
 import { pkr, stageLabel } from "@/lib/format";
 import { shrinkImage, uploadPhoto } from "@/lib/image";
@@ -32,7 +32,8 @@ export default function OrderPage() {
   const { stores } = useSession();
   const toast = useToast();
   const router = useRouter();
-  const [deletable, setDeletable] = useState<{ ok: boolean; reason: string | null } | null>(null);
+  const confirmCard = useConfirm();
+  const [onDelete, setOnDelete] = useState<{ stockOut: boolean; payments: number; invoiceNumber: string | null; numberComesBack: boolean } | null>(null);
   const base = `/stores/${storeId}/orders/${orderId}`;
   const store = stores.find((s) => s.id === storeId);
   const [order, setOrder] = useState<Order | null>(null);
@@ -54,9 +55,9 @@ export default function OrderPage() {
 
   const load = useCallback(async () => {
     try {
-      const { order: o, deletable: d } = await api<{ order: Order; deletable: { ok: boolean; reason: string | null } }>(base);
+      const { order: o, onDelete: d } = await api<{ order: Order; onDelete: NonNullable<typeof onDelete> }>(base);
       setOrder(o);
-      setDeletable(d);
+      setOnDelete(d);
       api<{ invoice: Invoice }>(`${base}/invoice`).then((r) => setInvoice(r.invoice)).catch(() => setInvoice(null));
       api<{ card: { url: string | null } | null }>(`${base}/card`).then((r) => setCard(r.card)).catch(() => setCard(null));
       if (o.deliveryKind === "local") {
@@ -228,7 +229,7 @@ export default function OrderPage() {
                 <button className="btn quiet" disabled={busy} onClick={() => run(async () => { await api(`${base}/card`, { method: "POST", body: {} }); return "Delivery card link made · works for 7 days"; })}><Icon name="link" size={18} />{card ? "Make a new delivery card link" : "Make delivery card link"}</button>
               )}
               {cardUrl && (
-                <button className="linkbtn" style={{ justifySelf: "start" }} disabled={busy} onClick={() => { if (confirm("Make a new link? The old one will stop working.")) void run(async () => { await api(`${base}/card`, { method: "POST", body: {} }); return "New delivery card link made · the old one is off"; }).catch(() => undefined); }}>Make a new link</button>
+                <button className="linkbtn" style={{ justifySelf: "start" }} disabled={busy} onClick={async () => { if (!(await confirmCard({ title: "Make a new link?", body: <p>The old link will stop working.</p>, confirm: "Make a new link" })).ok) return; void run(async () => { await api(`${base}/card`, { method: "POST", body: {} }); return "New delivery card link made · the old one is off"; }).catch(() => undefined); }}>Make a new link</button>
               )}
               <div className="chips">
                 {templates.map(([key, label]) => (
@@ -270,13 +271,27 @@ export default function OrderPage() {
             )}
           </section>
 
-          {(order.status === "pending" || order.status === "cancelled") && deletable && (
+          {onDelete && (
             <section className="well">
               <h2>Delete this order</h2>
-              <p className="note">{deletable.ok ? "Removes the order, its invoice and its delivery link. The invoice number is given back, so the numbers stay without gaps." : deletable.reason}</p>
-              <button className="btn danger" disabled={busy || !deletable.ok} onClick={() => {
-                if (!confirm(`Delete order #${order.orderNo} for ${order.customerName}? It, its invoice and its delivery link are removed for good.`)) return;
-                void run(async () => { await api(base, { method: "DELETE" }); toast(`Order #${order.orderNo} deleted`); router.push("/orders"); }).catch(() => undefined);
+              <p className="note">Removes the order, its invoice, payments and delivery link for good. To keep it on record, Cancel it instead.</p>
+              <button className="btn danger" disabled={busy} onClick={async () => {
+                const gone = onDelete.invoiceNumber
+                  ? onDelete.numberComesBack ? `Invoice ${onDelete.invoiceNumber} is the latest, so its number is given back.` : `Invoice ${onDelete.invoiceNumber} will stay missing from your numbers; the next order gets the next number.`
+                  : null;
+                const { ok, ticked } = await confirmCard({
+                  title: `Delete order #${order.orderNo}?`,
+                  body: <>
+                    <p>{order.customerName}&apos;s order, its invoice and its delivery link are removed for good.</p>
+                    {order.paid > 0 && <p>The payments recorded on it (PKR {order.paid.toLocaleString("en-US")}) are deleted too.</p>}
+                    {gone && <p>{gone}</p>}
+                  </>,
+                  confirm: "Delete order",
+                  danger: true,
+                  tick: onDelete.stockOut ? { label: "Put the stock back", checked: true } : undefined,
+                });
+                if (!ok) return;
+                void run(async () => { await api(base, { method: "DELETE", body: { restoreStock: onDelete.stockOut ? ticked : true } }); toast(`Order #${order.orderNo} deleted`); router.push("/orders"); }).catch(() => undefined);
               }}>Delete order</button>
             </section>
           )}
@@ -294,13 +309,13 @@ export default function OrderPage() {
       {!closed && (
         <div className="dock">
           {order.status !== "delivered" && (
-            <button className="btn quiet" disabled={busy} onClick={() => { if (confirm(`Cancel order #${order.orderNo}? Stock that was taken out stays out until you put it back.`)) void move("cancelled").catch(() => undefined); }}>Cancel</button>
+            <button className="btn quiet" disabled={busy} onClick={async () => { if (!(await confirmCard({ title: `Cancel order #${order.orderNo}?`, body: <p>It stays on record as cancelled and keeps its invoice number. Stock that was taken out stays out until you put it back.</p>, confirm: "Cancel the order" })).ok) return; void move("cancelled").catch(() => undefined); }}>Cancel</button>
           )}
           {step ? <button className="btn grow" disabled={busy} onClick={() => void move(step.to).catch(() => undefined)}>{step.label}</button>
             : order.status === "delivered" ? (
               <>
                 {/* A delivered cash-on-delivery order is not finished until the cash is in: that is the main step until then. */}
-                <button className="btn quiet grow" style={cashDue ? { flex: "0 0 auto" } : undefined} disabled={busy} onClick={() => { if (confirm("Mark this order as returned?")) void move("returned").catch(() => undefined); }}>Mark returned</button>
+                <button className="btn quiet grow" style={cashDue ? { flex: "0 0 auto" } : undefined} disabled={busy} onClick={async () => { if (!(await confirmCard({ title: "Mark this order as returned?", confirm: "Mark returned" })).ok) return; void move("returned").catch(() => undefined); }}>Mark returned</button>
                 {cashDue && <button className="btn grow" disabled={busy} onClick={() => run(async () => { if (order.payment === "cod") await api(`${base}/payment/cash-handover`, { method: "POST" }); else await api(`${base}/payments`, { method: "POST", body: { amount: owing } }); return order.payment === "cod" ? "Cash received · order settled" : "Payment received · order settled"; }).catch(() => undefined)}><Icon name="cash" size={18} />{order.payment === "unpaid" ? "Got paid" : "Got the cash"}</button>}
               </>
             ) : null}

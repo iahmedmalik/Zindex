@@ -357,3 +357,17 @@ main li > a:not(.row):not(.tile):not(.btn), main > a.note, .page > a.note { disp
 .backdrop { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; color: var(--route); opacity: 0.32; }
 .app > header, .app > main { position: relative; z-index: 1; }
 @media print { .backdrop { display: none; } }
+
+/* A card over the page (confirm boxes, the item discount): rises from the bottom on a phone, centred on a laptop,
+   the page blurred behind it. Same easing and travel as everything else; it leaves faster than it arrives. */
+.dlg-scrim { position: fixed; inset: 0; z-index: 60; display: flex; align-items: flex-end; justify-content: center; background: rgb(21 14 16 / 0); backdrop-filter: blur(0); -webkit-backdrop-filter: blur(0); transition: background var(--t-exit) var(--ease-out), backdrop-filter var(--t-exit) var(--ease-out), -webkit-backdrop-filter var(--t-exit) var(--ease-out); }
+.dlg-scrim.on { background: rgb(21 14 16 / 0.4); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); transition-duration: var(--t-base); transition-timing-function: var(--ease); }
+.dlg { width: min(100%, 460px); display: grid; gap: 14px; padding: 22px 20px calc(22px + env(safe-area-inset-bottom)); border-radius: var(--r-lg) var(--r-lg) 0 0; background: var(--surface); color: var(--ink); box-shadow: var(--shadow-sheet); opacity: 0; transform: translateY(calc(var(--travel) * 3)); transition: opacity var(--t-exit) var(--ease-out), transform var(--t-exit) var(--ease-out); }
+.dlg-scrim.on .dlg { opacity: 1; transform: none; transition: opacity var(--t-base) var(--ease), transform var(--t-enter) var(--ease); }
+.dlg-actions { display: grid; grid-template-columns: 1fr 1.4fr; gap: 10px; }
+.btn.danger-solid { background: var(--bad); border-color: var(--bad); color: #fff; }
+.btn.danger-solid:hover { background: color-mix(in srgb, var(--bad) 88%, #000); }
+@media (min-width: 720px) {
+  .dlg-scrim { align-items: center; padding: 24px; }
+  .dlg { border-radius: var(--r-lg); padding-bottom: 22px; box-shadow: var(--shadow-pop); transform: translateY(var(--travel)) scale(0.98); }
+}

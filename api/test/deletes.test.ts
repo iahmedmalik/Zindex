@@ -16,11 +16,11 @@ const api = (cookie: string) => {
     deleteProduct: (store: string, product: string) => call("delete", `/v1/stores/${store}/products/${product}`),
     order: async (store: string, body: object = {}) => (await call("post", `/v1/stores/${store}/orders`, { customerName: "Ayesha", items: [{ name: "Spice", quantity: 1, unitPrice: 1000 }], ...body })).body.order.id as string,
     get: (store: string, order: string) => call("get", `/v1/stores/${store}/orders/${order}`),
-    del: (store: string, order: string) => call("delete", `/v1/stores/${store}/orders/${order}`),
+    del: (store: string, order: string, body?: object) => call("delete", `/v1/stores/${store}/orders/${order}`, body),
+    stock: async (store: string) => (await call("get", `/v1/stores/${store}/stock`)).body.stock as { productId: string; onHand: number }[],
     status: (store: string, order: string, status: string) => call("post", `/v1/stores/${store}/orders/${order}/status`, { status }),
     invoice: async (store: string, order: string) => (await call("get", `/v1/stores/${store}/orders/${order}/invoice`)).body.invoice?.number as string,
     adjust: (store: string, productId: string, delta: number) => call("post", `/v1/stores/${store}/stock/adjust`, { productId, delta }),
-    restore: (store: string, order: string) => call("post", `/v1/stores/${store}/orders/${order}/restore-stock`),
     sales: async () => (await call("get", `/v1/reports/sales?from=${today}&to=${today}`)).body,
     card: (store: string, order: string) => call("get", `/v1/stores/${store}/orders/${order}/card`),
     confirmPayment: (store: string, order: string) => call("post", `/v1/stores/${store}/orders/${order}/payment/confirm`),
@@ -73,18 +73,18 @@ describe("a price edited on an order", () => {
 });
 
 describe("deleting an order", () => {
-  it("removes a pending order that has the store's latest invoice number, and gives the number back", async () => {
+  it("removes an order that has the store's latest invoice number, and gives the number back", async () => {
     const o = await newVerifiedOwner(t.app, t.mailer);
     const a = api(o.cookie);
     const store = await a.store();
     const keep = await a.order(store);
     const mistake = await a.order(store);
     const number = await a.invoice(store, mistake);
-    expect((await a.get(store, mistake)).body.deletable).toEqual({ ok: true, reason: null });
+    expect((await a.get(store, mistake)).body.onDelete).toEqual({ stockOut: false, payments: 0, invoiceNumber: number, numberComesBack: true });
 
     const gone = await a.del(store, mistake);
     expect(gone.status).toBe(200);
-    expect(gone.body).toEqual({ deleted: true, invoiceNumberReleased: true });
+    expect(gone.body).toEqual({ deleted: true, invoiceNumberReleased: true, stockPutBack: false });
     expect((await a.get(store, mistake)).status).toBe(404);
     expect((await a.sales()).totals.orders).toBe(1);
     const next = await a.order(store);
@@ -92,57 +92,77 @@ describe("deleting an order", () => {
     expect(await a.invoice(store, keep)).not.toBe(number);
   });
 
-  it("is refused for an older order, because its number would leave a gap: Cancel keeps the number", async () => {
+  it("deletes an older order too: its number stays missing, and the card says so beforehand", async () => {
     const o = await newVerifiedOwner(t.app, t.mailer);
     const a = api(o.cookie);
     const store = await a.store();
     const older = await a.order(store);
-    await a.order(store);
-    const check = (await a.get(store, older)).body.deletable;
-    expect(check.ok).toBe(false);
-    expect(check.reason).toMatch(/latest/);
-    const refused = await a.del(store, older);
-    expect(refused.status).toBe(409);
-    expect(refused.body.error).toMatch(/Cancel the order instead/);
-    expect((await a.get(store, older)).status).toBe(200); // still there
+    const olderNumber = await a.invoice(store, older);
+    const newer = await a.order(store);
+    const newerNumber = await a.invoice(store, newer);
+    expect((await a.get(store, older)).body.onDelete).toMatchObject({ invoiceNumber: olderNumber, numberComesBack: false });
+
+    const gone = await a.del(store, older);
+    expect(gone.status).toBe(200);
+    expect(gone.body.invoiceNumberReleased).toBe(false);
+    expect((await a.get(store, older)).status).toBe(404);
+    const after = await a.order(store);
+    const afterNumber = await a.invoice(store, after);
+    expect(afterNumber).not.toBe(olderNumber); // a number is never handed out twice
+    expect(afterNumber).not.toBe(newerNumber);
   });
 
-  it("is refused once the order is confirmed or later, while stock is still out, or when a payment is recorded", async () => {
+  it("deletes a delivered, paid order too, with its payments", async () => {
+    const o = await newVerifiedOwner(t.app, t.mailer);
+    const a = api(o.cookie);
+    const store = await a.store();
+    const paid = await a.order(store, { payment: "paid", paymentMethod: "easypaisa" });
+    await a.confirmPayment(store, paid);
+    for (const s of ["confirmed", "packed", "out_for_delivery", "delivered"]) await a.status(store, paid, s);
+    expect((await a.get(store, paid)).body.onDelete.payments).toBeGreaterThan(0);
+
+    expect((await a.del(store, paid)).status).toBe(200);
+    expect((await a.get(store, paid)).status).toBe(404);
+    expect((await a.sales()).totals.orders).toBe(0);
+  });
+
+  it("puts the stock back by default, or keeps it out when the goods are really gone", async () => {
     const o = await newVerifiedOwner(t.app, t.mailer);
     const a = api(o.cookie);
     const store = await a.store();
     const masala = await a.product(store, "Masala", 500, 300);
     await a.adjust(store, masala, 10);
+    const onHand = async () => (await a.stock(store)).find((r) => r.productId === masala)!.onHand;
 
-    const confirmed = await a.order(store, { items: [{ productId: masala, quantity: 2 }] });
-    await a.status(store, confirmed, "confirmed");
-    expect((await a.del(store, confirmed)).body.error).toMatch(/Only a pending or cancelled order/);
-    await a.status(store, confirmed, "cancelled");
-    expect((await a.del(store, confirmed)).body.error).toMatch(/Put the stock back first/); // cancelled, but its stock is still out
+    const back = await a.order(store, { items: [{ productId: masala, quantity: 2 }] });
+    await a.status(store, back, "confirmed");
+    expect(await onHand()).toBe(8);
+    expect((await a.get(store, back)).body.onDelete.stockOut).toBe(true);
+    const r1 = await a.del(store, back);
+    expect(r1.body.stockPutBack).toBe(true);
+    expect(await onHand()).toBe(10);
 
-    const paid = await a.order(store, { payment: "paid", paymentMethod: "easypaisa" });
-    await a.confirmPayment(store, paid);
-    expect((await a.del(store, paid)).body.error).toMatch(/payment/i);
+    const lost = await a.order(store, { items: [{ productId: masala, quantity: 3 }] });
+    await a.status(store, lost, "confirmed");
+    expect(await onHand()).toBe(7);
+    const r2 = await a.del(store, lost, { restoreStock: false });
+    expect(r2.body.stockPutBack).toBe(false);
+    expect(await onHand()).toBe(7); // the loss stays in the ledger as an adjustment
   });
 
-  it("deletes a cancelled order whose stock is back, takes its card link down, and is private to the owner", async () => {
+  it("takes the card link down, and is private to the owner", async () => {
     const x = await newVerifiedOwner(t.app, t.mailer);
     const y = await newVerifiedOwner(t.app, t.mailer);
     const a = api(x.cookie);
     const store = await a.store();
-    const masala = await a.product(store, "Masala", 500, 300);
-    await a.adjust(store, masala, 10);
-    const order = await a.order(store, { items: [{ productId: masala, quantity: 2 }] });
-    await a.status(store, order, "confirmed"); // stock goes out, and the card link is made
+    const order = await a.order(store);
+    await a.status(store, order, "confirmed"); // the card link is made
     const token = ((await a.card(store, order)).body.card.url as string).split("/c/")[1];
     expect((await request(t.app).get(`/v1/public/card/${token}`)).status).toBe(200);
-    await a.status(store, order, "cancelled");
-    await a.restore(store, order);
 
     expect((await api(y.cookie).del(store, order)).status).toBe(404);
-    const gone = await a.del(store, order);
-    expect(gone.status).toBe(200);
+    expect((await a.get(store, order)).status).toBe(200); // the other owner changed nothing
+    expect((await a.del(store, order)).status).toBe(200);
     expect((await request(t.app).get(`/v1/public/card/${token}`)).status).toBe(404); // the customer's link no longer opens
-    expect((await a.get(store, order)).status).toBe(404);
   });
 });
