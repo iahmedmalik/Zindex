@@ -23,7 +23,9 @@ Money still to collect is one tap away, in three groups (with riders, from custo
   <img src="docs/screenshots/cash-phone.png" alt="Cash to collect on a phone: an order delivered today, with Got the payment, Add payment and Remind" width="230">
 </p>
 
-*All screenshots are of the built-in demo, with made-up shops, customers and orders. The live address is added at release.*
+**Live:** [zindex-seven.vercel.app](https://zindex-seven.vercel.app). Tap **Try the demo** on the sign-in page to look around with no account.
+
+*All screenshots are of the built-in demo, with made-up shops, customers and orders.*
 
 ## What it does
 
