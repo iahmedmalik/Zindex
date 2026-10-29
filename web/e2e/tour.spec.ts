@@ -1,11 +1,12 @@
 import { expect, test } from "@playwright/test";
-import { DEMO } from "./helpers";
+import { DEMO, LIVE_DEMO } from "./helpers";
 
 // The walk-through tour: it opens on a first sign-in and every time the demo starts, closes with
 // Skip (and stays closed), and can be replayed from More. It must also fit a 375 px phone.
 
 test.describe("the walk-through tour", () => {
   test("@smoke opens on a first sign-in, stays closed after Skip, and replays from More", async ({ page }) => {
+    test.skip(LIVE_DEMO, "types the demo login, which only exists locally; the Try the demo test below covers the live tour");
     await page.goto("/sign-in");
     await page.getByLabel("Email").fill(DEMO.email);
     await page.getByLabel("Password").fill(DEMO.password);

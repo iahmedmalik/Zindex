@@ -1,8 +1,9 @@
 import { expect, test } from "@playwright/test";
-import { DEMO, addRider, createOrder, freshPhone, signIn } from "./helpers";
+import { DEMO, LIVE_DEMO, addRider, createOrder, freshPhone, signIn } from "./helpers";
 
 test.describe("sign-in", () => {
   test("@smoke refuses a wrong password and lets the owner in with the right one", async ({ page }) => {
+    test.skip(LIVE_DEMO, "types the demo login, which only exists locally; live runs sign in with Try the demo");
     await page.goto("/sign-in");
     await page.getByLabel("Email").fill(DEMO.email);
     await page.getByLabel("Password").fill("not-the-password");

@@ -83,6 +83,7 @@ Sign in as `demo@zindex.test` with the password `zindex-demo-1234` (local develo
 npm test                                # API tests on a real local PostgreSQL (also run in CI)
 npm run test:e2e -w @zindex/web         # browser tests, desktop and a 375 px phone (stack must be running)
 npm run test:smoke -w @zindex/web       # the short set to run after a deploy (E2E_BASE_URL=…)
+# against the live site, add E2E_LIVE_DEMO=1: it signs in with Try the demo (the local demo login does not exist there)
 npm run load -w @zindex/api             # a load test with real numbers
 ```
 

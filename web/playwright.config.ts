@@ -10,7 +10,8 @@ const channel = process.env.CI ? undefined : "msedge";
 export default defineConfig({
   testDir: "./e2e",
   timeout: 90_000,
-  expect: { timeout: 15_000 },
+  // Live runs talk to a free server that is sometimes slow to answer, so each check may wait longer there.
+  expect: { timeout: process.env.E2E_LIVE_DEMO === "1" ? 30_000 : 15_000 },
   fullyParallel: false,
   workers: 1,
   retries: process.env.CI ? 1 : 0,

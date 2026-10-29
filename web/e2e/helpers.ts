@@ -2,8 +2,20 @@ import { expect, type Page } from "@playwright/test";
 
 export const DEMO = { email: "demo@zindex.test", password: "zindex-demo-1234" };
 
+/**
+ * Against the live site the local demo login does not exist (the server answers 401), so E2E_LIVE_DEMO=1 signs in with the
+ * "Try the demo" button instead, which needs no password. Tests that type credentials are skipped in that mode.
+ */
+export const LIVE_DEMO = process.env.E2E_LIVE_DEMO === "1";
+
 export async function signIn(page: Page) {
   await page.goto("/sign-in");
+  if (LIVE_DEMO) {
+    await page.getByRole("button", { name: "Try the demo" }).click();
+    await expect(page.getByText("Needs you now")).toBeVisible({ timeout: 60_000 });
+    await skipTour(page);
+    return;
+  }
   await page.getByLabel("Email").fill(DEMO.email);
   await page.getByLabel("Password").fill(DEMO.password);
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
