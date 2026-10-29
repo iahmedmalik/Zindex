@@ -78,7 +78,6 @@ export const stores = pgTable(
     phone: text("phone"),
     email: text("email"),
     address: text("address"),
-    logoUrl: text("logo_url"),
     logoVersion: bigint("logo_version", { mode: "number" }),
     watermarkVersion: bigint("watermark_version", { mode: "number" }),
     watermarkOn: boolean("watermark_on").notNull().default(true),

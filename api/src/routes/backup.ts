@@ -7,7 +7,7 @@ import { rows } from "../db/query";
 // row-level security guarantees another owner's rows can never be in it. Secrets and sign-in data
 // (passwords, sessions, card link hashes) are left out on purpose.
 const tables = [
-  ["stores", sql`select id, name, phone, address, logo_url, accent, invoice_prefix, created_at from stores order by created_at`],
+  ["stores", sql`select id, name, phone, address, accent, invoice_prefix, created_at from stores order by created_at`],
   ["products", sql`select id, store_id, name, price, cost, active, shopify_product_id, image_url, created_at from products order by created_at`],
   ["customers", sql`select id, store_id, name, phone, addresses, notes, created_at from customers order by created_at`],
   ["orders", sql`select * from orders order by created_at`],
@@ -16,9 +16,7 @@ const tables = [
   ["invoiceEdits", sql`select id, invoice_id, changed, before, after, created_at from invoice_edits order by created_at`],
   ["stockMovements", sql`select id, store_id, product_id, delta, reason, order_id, note, created_at from stock_movements order by created_at`],
   ["deliveries", sql`select * from deliveries order by created_at`],
-  ["deliveryEvents", sql`select id, delivery_id, status, created_at from delivery_events order by created_at`],
   ["shipments", sql`select * from shipments order by created_at`],
-  ["shipmentEvents", sql`select id, shipment_id, status, note, created_at from shipment_events order by created_at`],
   ["messageTemplates", sql`select id, store_id, key, body, updated_at from message_templates order by store_id, key`],
 ] as const;
 

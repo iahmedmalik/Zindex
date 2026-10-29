@@ -10,7 +10,7 @@ const API_URL = process.env.API_URL ?? "http://127.0.0.1:4000";
 const fmt = (n: number) => n.toLocaleString("en-US");
 
 type Card = {
-  store: { name: string; phone: string | null; email: string | null; address: string | null; logoUrl: string | null; hasLogo?: boolean; accent: string };
+  store: { name: string; phone: string | null; email: string | null; address: string | null; hasLogo?: boolean; accent: string };
   order: { orderNo: number; status: string; customerName: string; address: string | null; payment: string; items: { name: string; quantity: number }[]; subtotal: number; discount: number; deliveryCharge: number; total: number; riderFee: number; codAmount: number; collectAtDoor: number; paid: number };
   delivery: { service: string | null; riderName: string | null; riderPhone: string | null; bikeNumber: string | null; riderPhotoUrl: string | null; hasPhoto: boolean; riderPhotoTakenAt: string | null; trackingUrl: string | null; riderScreenshotUrl: string | null } | null;
   expiresAt: string;

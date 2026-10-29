@@ -87,7 +87,9 @@ describe("delivery card", () => {
     expect(card.headers["cache-control"]).toBe("no-store");
     expect(card.headers["x-robots-tag"]).toContain("noindex");
     expect(card.body.card.order).toMatchObject({ customerName: "Ayesha", total: 900, riderFee: 350, collectAtDoor: 1250 });
-    expect(card.body.card.delivery).toMatchObject({ riderName: "Imran", bikeNumber: "LEA-1234", riderPhone: "03217654321", status: "pending" });
+    expect(card.body.card.delivery).toMatchObject({ riderName: "Imran", bikeNumber: "LEA-1234", riderPhone: "03217654321" });
+    // The order's status is the only status: the delivery has none of its own.
+    expect(card.body.card.delivery).not.toHaveProperty("status");
     expect(card.body.card.store.name).toBeTruthy();
     // Nothing private leaks: no customer phone, no ids, no owner.
     const text = JSON.stringify(card.body);

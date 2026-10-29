@@ -46,11 +46,9 @@ export type Delivery = {
   riderScreenshotUrl: string | null;
   pickupAddress: string | null;
   notes: string | null;
-  cashHandedOver: boolean;
-  cashHandedAt: Date | null;
 };
 
-const cols = sql`id, order_id, service, rider_name, rider_phone, bike_number, rider_photo_url, rider_photo_taken_at, tracking_url, rider_screenshot_url, pickup_address, notes, cash_handed_over, cash_handed_at, exists (select 1 from delivery_photos p where p.delivery_id = deliveries.id) as has_photo`;
+const cols = sql`id, order_id, service, rider_name, rider_phone, bike_number, rider_photo_url, rider_photo_taken_at, tracking_url, rider_screenshot_url, pickup_address, notes, exists (select 1 from delivery_photos p where p.delivery_id = deliveries.id) as has_photo`;
 
 async function loadDelivery(tx: Tx, orderId: string) {
   const [delivery] = await rows<Delivery>(tx, sql`select ${cols} from deliveries where order_id = ${orderId}`);
