@@ -68,7 +68,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   );
 
   if (error) return <div className="solo"><div className="panel"><p className="error" role="alert">{error}</p><button className="btn" onClick={() => { setError(null); void reload(); }}>Try again</button></div></div>;
-  // The free server sleeps when nobody uses it; the first visit can take up to a minute to wake it.
-  if (!value) return <div className="solo" aria-busy="true"><div className="panel"><div className="skel"><span /><span /><span /></div><p className="note">Opening your shop… The server may be waking up, which can take a moment.</p></div></div>;
+  // The free server sleeps when nobody uses it; api() keeps waiting for it, so this screen can last up to a minute.
+  if (!value) return <div className="solo" aria-busy="true"><div className="panel"><div className="skel"><span /><span /><span /></div><p className="note">Opening your shop…</p></div></div>;
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
