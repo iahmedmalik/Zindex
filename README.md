@@ -25,7 +25,11 @@ Money still to collect is one tap away, in three groups (with riders, from custo
 
 **Live:** [zindex-seven.vercel.app](https://zindex-seven.vercel.app). Tap **Try the demo** on the sign-in page to look around with no account.
 
-*All screenshots are of the built-in demo, with made-up shops, customers and orders.*
+**Watch the 49-second film** (click the picture to play it):
+
+[![The Zindex film: who is the rider, an order typed in on a phone, the invoice, the customer's link and cash to collect](docs/screenshots/film-poster.jpg)](docs/zindex-film.mp4)
+
+*All screenshots and the film are of the built-in demo, with made-up shops, customers and orders.*
 
 ## What it does
 
