@@ -19,7 +19,7 @@ const address = z.string().trim().min(1).max(300);
 const createBody = z
   .object({
     name: z.string().trim().min(1).max(120),
-    phone,
+    phone: phone.nullable().optional(),
     addresses: z.array(address).max(10).optional(),
     notes: z.string().trim().max(500).nullable().optional(),
   })
@@ -30,7 +30,7 @@ const returning = sql`id, store_id, name, phone, addresses, notes, created_at`;
 // Repeat customers are the ones with more than one order.
 const withCount = sql`id, store_id, name, phone, addresses, notes, created_at, (select count(*)::int from orders o where o.customer_id = customers.id) as order_count`;
 
-export type Customer = { id: string; storeId: string; name: string; phone: string; addresses: string[]; notes: string | null; createdAt: Date; orderCount?: number };
+export type Customer = { id: string; storeId: string; name: string; phone: string | null; addresses: string[]; notes: string | null; createdAt: Date; orderCount?: number };
 
 // Mounted at /v1/stores/:storeId/customers
 export function customersRouter(db: Db): Router {
@@ -68,8 +68,8 @@ export function customersRouter(db: Db): Router {
         rows<Customer & { inserted: boolean }>(
           tx,
           sql`insert into customers (store_id, name, phone, addresses, notes)
-              values (${storeIdOf(req)}, ${b.name}, ${b.phone}, ${textArray(b.addresses ?? [])}, ${b.notes ?? null})
-              on conflict (store_id, phone) do update set
+              values (${storeIdOf(req)}, ${b.name}, ${b.phone ?? null}, ${textArray(b.addresses ?? [])}, ${b.notes ?? null})
+              on conflict ${b.phone ? sql`(store_id, phone)` : sql`(store_id, lower(name)) where phone is null`} do update set
                 name = excluded.name,
                 addresses = (select coalesce(array_agg(distinct a), '{}') from unnest(customers.addresses || excluded.addresses) a),
                 notes = coalesce(excluded.notes, customers.notes),
@@ -92,7 +92,7 @@ export function customersRouter(db: Db): Router {
           tx,
           sql`update customers set
                 name = coalesce(${b.name ?? null}, name),
-                phone = coalesce(${b.phone ?? null}, phone),
+                phone = case when ${"phone" in b} then ${b.phone ?? null} else phone end,
                 addresses = case when ${b.addresses !== undefined} then ${textArray(b.addresses ?? [])} else addresses end,
                 notes = case when ${"notes" in b} then ${b.notes ?? null} else notes end,
                 updated_at = now()
@@ -102,7 +102,7 @@ export function customersRouter(db: Db): Router {
       if (!customer) throw new HttpError(404, "Customer not found.");
       res.json({ customer });
     } catch (err) {
-      if (pgCode(err) === "23505") throw new HttpError(409, "Another customer in this store already has that phone number.");
+      if (pgCode(err) === "23505") throw new HttpError(409, "Another customer in this store already has that number, or that name without a number.");
       throw err;
     }
   });

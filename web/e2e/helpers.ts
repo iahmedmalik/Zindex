@@ -59,3 +59,11 @@ export async function openStock(page: Page) {
   if (await pick.waitFor({ state: "visible", timeout: 6000 }).then(() => true, () => false)) await page.getByRole("button", { name: /Sheen Food/ }).first().click();
   await expect(page.getByRole("button", { name: "Product", exact: true })).toBeVisible();
 }
+
+/** Opens the Customers screen on Sheen Food, picking the store first when the page asks. */
+export async function openCustomers(page: Page) {
+  await page.goto("/customers");
+  const pick = page.getByText("Pick a store");
+  if (await pick.waitFor({ state: "visible", timeout: 6000 }).then(() => true, () => false)) await page.getByRole("button", { name: /Sheen Food/ }).first().click();
+  await expect(page.getByLabel("Search customers")).toBeVisible();
+}

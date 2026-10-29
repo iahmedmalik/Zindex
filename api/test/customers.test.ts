@@ -73,6 +73,61 @@ describe("customers", () => {
     expect((await request(t.app).delete(`/v1/stores/${store}/customers/${c.id}`).set("Cookie", b.cookie)).status).toBe(404);
   });
 
+  it("saves a customer with a name only, finds them by name, and never saves the same name twice in one store", async () => {
+    const o = await newVerifiedOwner(t.app, t.mailer);
+    const a = api(o.cookie);
+    const store = await a.store();
+    const made = await a.save(store, { name: "Uncle Rashid", addresses: ["Shop 3, Main Market"] });
+    expect(made.status).toBe(201);
+    expect(made.body.customer).toMatchObject({ name: "Uncle Rashid", phone: null });
+
+    const again = await a.save(store, { name: "uncle rashid", addresses: ["Second address"] });
+    expect(again.status).toBe(200); // the same customer, not a second one
+    expect(again.body.customer.id).toBe(made.body.customer.id);
+    expect(again.body.customer.addresses.sort()).toEqual(["Second address", "Shop 3, Main Market"]);
+    expect((await a.list(store, "rashid")).body.customers).toHaveLength(1);
+
+    const withPhone = await a.save(store, { name: "Uncle Rashid", phone: "03001230000" }); // same name, a phone: a different person
+    expect(withPhone.status).toBe(201);
+    expect((await a.list(store, "rashid")).body.customers).toHaveLength(2);
+
+    const id = made.body.customer.id as string;
+    const gave = await request(t.app).patch(`/v1/stores/${store}/customers/${id}`).set("Cookie", o.cookie).send({ phone: "03004560000" });
+    expect(gave.body.customer.phone).toBe("03004560000"); // a phone can be added later
+  });
+
+  it("an order with a name and no phone saves the customer, and the next such order finds the same one", async () => {
+    const o = await newVerifiedOwner(t.app, t.mailer);
+    const a = api(o.cookie);
+    const store = await a.store();
+    const order = (body: object) => request(t.app).post(`/v1/stores/${store}/orders`).set("Cookie", o.cookie).send({ items: [{ name: "Spice", quantity: 1, unitPrice: 500 }], ...body });
+    const first = await order({ customerName: "Walk-in Sadia", address: "Gulberg" });
+    const second = await order({ customerName: "Walk-in Sadia", address: "Johar Town" });
+    expect(first.body.order.customerId).toBeTruthy();
+    expect(second.body.order.customerId).toBe(first.body.order.customerId);
+    const found = (await a.list(store, "sadia")).body.customers;
+    expect(found).toHaveLength(1);
+    expect(found[0]).toMatchObject({ phone: null, orderCount: 2 });
+    expect(found[0].addresses.sort()).toEqual(["Gulberg", "Johar Town"]);
+  });
+
+  it("edits a customer: the name, the number (added, changed or removed) and the addresses; a clash is refused", async () => {
+    const o = await newVerifiedOwner(t.app, t.mailer);
+    const a = api(o.cookie);
+    const store = await a.store();
+    const edit = (id: string, body: object) => request(t.app).patch(`/v1/stores/${store}/customers/${id}`).set("Cookie", o.cookie).send(body);
+    const first = (await a.save(store, { name: "Hina", phone: "03001110001", addresses: ["Old street"] })).body.customer.id as string;
+    const second = (await a.save(store, { name: "Hira", phone: "03001110002" })).body.customer.id as string;
+
+    expect((await edit(first, { name: "Hina Malik", addresses: ["New street", "Office"] })).body.customer).toMatchObject({ name: "Hina Malik", phone: "03001110001", addresses: ["New street", "Office"] });
+    expect((await edit(first, { phone: "0300 111 0009" })).body.customer.phone).toBe("03001110009");
+    expect((await edit(first, { phone: null })).body.customer.phone).toBeNull(); // the number can be removed
+    expect((await edit(first, { phone: "03001110002" })).status).toBe(409); // another customer has that number
+    expect((await edit(second, { phone: null })).status).toBe(200);
+    expect((await edit(second, { name: "hina MALIK" })).status).toBe(409); // two customers without a number cannot share a name
+    expect((await edit(second, { name: "Hira Khan" })).status).toBe(200);
+  });
+
   it("refuses a bad phone, an empty name and unknown fields", async () => {
     const o = await newVerifiedOwner(t.app, t.mailer);
     const a = api(o.cookie);

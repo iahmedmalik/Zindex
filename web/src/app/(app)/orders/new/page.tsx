@@ -25,6 +25,8 @@ export default function NewOrderPage() {
   const [name, setName] = useState("");
   const [address, setAddress] = useState("");
   const [known, setKnown] = useState<Customer[]>([]);
+  const [typing, setTyping] = useState<"phone" | "name">("phone"); // which box the matches are for
+  const picked = useRef(""); // the customer just tapped, so the matches do not reopen for their own name and number
   const [flash, setFlash] = useState(0);
   const [lines, setLines] = useState<Line[]>([]);
   const [discount, setDiscount] = useState(0);
@@ -45,13 +47,14 @@ export default function NewOrderPage() {
     api<{ products: Product[] }>(`/stores/${formStore}/products`).then((r) => setProducts(r.products.filter((p) => p.active))).catch((e) => setError(messageOf(e)));
   }, [formStore]);
   useEffect(() => {
-    const term = phone.replace(/\D/g, "").length >= 4 ? phone.trim() : "";
-    if (!term || !formStore) { setKnown([]); return; }
+    // Matches for whichever box is being typed in: a number (4 digits or more) or a name (2 letters or more).
+    const term = typing === "phone" ? (phone.replace(/\D/g, "").length >= 4 ? phone.trim() : "") : (name.trim().length >= 2 ? name.trim() : "");
+    if (!term || !formStore || picked.current === `${name}|${phone}`) { setKnown([]); return; }
     const t = setTimeout(() => {
-      api<{ customers: Customer[] }>(`/stores/${formStore}/customers?q=${encodeURIComponent(term)}`).then((r) => setKnown(r.customers.slice(0, 3))).catch(() => setKnown([]));
+      api<{ customers: Customer[] }>(`/stores/${formStore}/customers?q=${encodeURIComponent(term)}`).then((r) => setKnown(r.customers.slice(0, 4))).catch(() => setKnown([]));
     }, 250);
     return () => clearTimeout(t);
-  }, [phone, formStore]);
+  }, [phone, name, typing, formStore]);
 
   const shown = useMemo(() => products.filter((p) => p.name.toLowerCase().includes(find.trim().toLowerCase())).slice(0, 16), [products, find]);
   const fee = kind === "local" ? digits(riderFee) : 0;
@@ -108,23 +111,23 @@ export default function NewOrderPage() {
 
       <section className="section">
         <h2>Customer</h2>
+        <label className="field"><span>Name</span><input key={`n${flash}`} className={`input${flash ? " flash" : ""}`} value={name} onChange={(e) => { setTyping("name"); setName(e.target.value); }} required autoComplete="off" placeholder="Type a name to find an old customer" /></label>
         <label className="field" style={{ position: "relative" }}>
           <span>WhatsApp number</span>
           <span style={{ position: "absolute", left: 12, top: 35, color: "var(--ink-2)" }}><Icon name="search" /></span>
-          <input className="input num" inputMode="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="0300 1234567" autoComplete="off" style={{ paddingLeft: 42 }} />
+          <input className="input num" inputMode="tel" value={phone} onChange={(e) => { setTyping("phone"); setPhone(e.target.value); }} placeholder="0300 1234567 (optional)" autoComplete="off" style={{ paddingLeft: 42 }} />
         </label>
         <div className={`expand${known.length ? " open" : ""}`}>
           <div className="stack">
             {known.map((c) => (
               <button type="button" key={c.id} className="row" style={{ border: "1px solid var(--store)", borderRadius: "var(--r-md)", padding: "12px 14px", background: "color-mix(in srgb, var(--store) 7%, var(--surface))", textAlign: "left", cursor: "pointer", gridTemplateColumns: "1fr auto" }}
-                onClick={() => { setName(c.name); setPhone(c.phone); setAddress(c.addresses[0] ?? ""); setKnown([]); setFlash((n) => n + 1); }}>
-                <span><b>{c.name}</b><br /><span className="meta">{c.addresses[0] ?? "No address saved"}</span></span>
+                onClick={() => { picked.current = `${c.name}|${c.phone ?? ""}`; setName(c.name); setPhone(c.phone ?? ""); setAddress(c.addresses[0] ?? ""); setKnown([]); setFlash((n) => n + 1); }}>
+                <span><b>{c.name}</b><br /><span className="meta num">{[c.phone, c.addresses[0] ?? (c.phone ? "No address saved" : null)].filter(Boolean).join(" · ")}</span></span>
                 {(c.orderCount ?? 0) > 0 && <span className="badge ok">{c.orderCount} order{c.orderCount === 1 ? "" : "s"} before</span>}
               </button>
             ))}
           </div>
         </div>
-        <label className="field"><span>Name</span><input key={`n${flash}`} className={`input${flash ? " flash" : ""}`} value={name} onChange={(e) => setName(e.target.value)} required autoComplete="off" /></label>
         <label className="field"><span>Address</span><textarea key={`a${flash}`} className={`input${flash ? " flash" : ""}`} rows={2} value={address} onChange={(e) => setAddress(e.target.value)} /></label>
       </section>
 

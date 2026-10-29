@@ -159,19 +159,30 @@ function totalsFor(items: Resolved[], v: { discountPercent: number; deliveryChar
   }
 }
 
-// Saves (or finds) the customer for an order so the next order from the same phone is one tap.
+// Saves (or finds) the customer for an order so the next order from the same person is one tap. With a phone the
+// customer is found by phone; with only a name, by name (a name-only customer is one per store).
 async function saveCustomer(tx: Tx, storeId: string, name: string, phone: string | null, address: string | null): Promise<string | null> {
-  if (!phone) return null;
-  const [c] = await rows<{ id: string }>(
-    tx,
-    sql`insert into customers (store_id, name, phone, addresses)
-        values (${storeId}, ${name}, ${phone}, ${textArray(address ? [address] : [])})
-        on conflict (store_id, phone) do update set
-          name = excluded.name,
-          addresses = (select coalesce(array_agg(distinct a), '{}') from unnest(customers.addresses || excluded.addresses) a),
-          updated_at = now()
-        returning id`,
-  );
+  const addresses = textArray(address ? [address] : []);
+  const [c] = phone
+    ? await rows<{ id: string }>(
+        tx,
+        sql`insert into customers (store_id, name, phone, addresses)
+            values (${storeId}, ${name}, ${phone}, ${addresses})
+            on conflict (store_id, phone) do update set
+              name = excluded.name,
+              addresses = (select coalesce(array_agg(distinct a), '{}') from unnest(customers.addresses || excluded.addresses) a),
+              updated_at = now()
+            returning id`,
+      )
+    : await rows<{ id: string }>(
+        tx,
+        sql`insert into customers (store_id, name, phone, addresses)
+            values (${storeId}, ${name}, null, ${addresses})
+            on conflict (store_id, lower(name)) where phone is null do update set
+              addresses = (select coalesce(array_agg(distinct a), '{}') from unnest(customers.addresses || excluded.addresses) a),
+              updated_at = now()
+            returning id`,
+      );
   return c?.id ?? null;
 }
 

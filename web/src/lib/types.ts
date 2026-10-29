@@ -43,7 +43,7 @@ export type Order = {
 
 export type Product = { id: string; name: string; price: number; cost: number | null; active: boolean };
 export type StockRow = { productId: string; name: string; price: number; cost: number | null; onHand: number; unitsSold: number };
-export type Customer = { id: string; name: string; phone: string; addresses: string[]; notes: string | null; orderCount?: number };
+export type Customer = { id: string; name: string; phone: string | null; addresses: string[]; notes: string | null; orderCount?: number };
 
 export type Delivery = {
   id: string;
