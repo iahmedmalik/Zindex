@@ -29,13 +29,31 @@ export async function deductForOrder(tx: Tx, storeId: string, orderId: string): 
   );
 }
 
+/**
+ * The items of an order that already took stock out were changed: the difference goes into the ledger as an 'edit'
+ * movement (more units sold = negative). `before` and `after` are the order's lines; lines typed by hand have no product.
+ */
+export async function adjustForEdit(tx: Tx, storeId: string, orderId: string, orderNo: number, before: { productId: string | null; quantity: number }[], after: { productId: string | null; quantity: number }[]): Promise<void> {
+  const sold = new Map<string, number>();
+  for (const l of before) if (l.productId) sold.set(l.productId, (sold.get(l.productId) ?? 0) - l.quantity);
+  for (const l of after) if (l.productId) sold.set(l.productId, (sold.get(l.productId) ?? 0) + l.quantity);
+  for (const [productId, soldMore] of sold) {
+    if (soldMore === 0) continue;
+    await tx.execute(
+      sql`insert into stock_movements (store_id, product_id, delta, reason, order_id, note)
+          values (${storeId}, ${productId}, ${-soldMore}, 'edit', ${orderId}, ${`Order #${orderNo} edited`})`,
+    );
+  }
+}
+
 /** Puts a cancelled or returned order's stock back. Only called after the owner approves. */
 export async function restoreForOrder(tx: Tx, storeId: string, orderId: string): Promise<number> {
   const put = await rows<{ id: string }>(
     tx,
     sql`insert into stock_movements (store_id, product_id, delta, reason, order_id)
-        select ${storeId}, product_id, -delta, 'restore', ${orderId}
-          from stock_movements where order_id = ${orderId} and reason = 'sale'
+        select ${storeId}, product_id, -sum(delta)::int, 'restore', ${orderId}
+          from stock_movements where order_id = ${orderId} and reason in ('sale', 'edit')
+         group by product_id having sum(delta) < 0
         on conflict (order_id, product_id) where reason = 'restore' do nothing
         returning id`,
   );

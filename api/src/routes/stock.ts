@@ -26,7 +26,7 @@ export function stockRouter(db: Db): Router {
         tx,
         sql`select p.id as product_id, p.name, p.price, p.cost,
                    coalesce(sum(m.delta), 0)::int as on_hand,
-                   coalesce(-sum(m.delta) filter (where m.reason in ('sale', 'restore')), 0)::int as units_sold
+                   coalesce(-sum(m.delta) filter (where m.reason in ('sale', 'restore', 'edit')), 0)::int as units_sold
               from products p left join stock_movements m on m.product_id = p.id
              where p.store_id = ${storeIdOf(req)}
              group by p.id order by lower(p.name)`,

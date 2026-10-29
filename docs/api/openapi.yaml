@@ -134,7 +134,7 @@ paths:
     parameters: [{ $ref: "#/components/parameters/storeId" }, { $ref: "#/components/parameters/orderId" }]
     get: { tags: [Orders], summary: "One order with its items, its expected and paid amounts, and deletable (ok and reason)", responses: { "200": { description: OK }, "404": { $ref: "#/components/responses/NotFound" } } }
     delete: { tags: [Orders], summary: "Delete an order at any stage, with its invoice, payments and delivery link. Body (optional): { restoreStock } puts the stock it took back (default true). The invoice number is given back when it was the store's latest; an older number stays missing", responses: { "200": { description: "{ deleted, invoiceNumberReleased, stockPutBack }" }, "404": { $ref: "#/components/responses/NotFound" } } }
-    patch: { tags: [Orders], summary: Edit and recalculate; items are locked once confirmed; edits after the invoice is final are logged, responses: { "200": { description: OK }, "409": { description: Locked } } }
+    patch: { tags: [Orders], summary: "Edit and recalculate, at any stage except cancelled or returned (409). Item discounts are { kind: percent or amount, value }. If the order took stock out, the change in items moves stock by the difference. Edits once the order is out for delivery are logged on the invoice", responses: { "200": { description: OK }, "409": { description: Locked } } }
   /v1/stores/{storeId}/orders/{orderId}/status:
     parameters: [{ $ref: "#/components/parameters/storeId" }, { $ref: "#/components/parameters/orderId" }]
     post:

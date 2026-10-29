@@ -123,7 +123,7 @@ export default function StockPage() {
                   {history.length === 0 ? <p className="note">No changes yet.</p> : (
                     <ul className="ledger">
                       {history.slice(0, 12).map((h) => (
-                        <li key={h.id} style={{ fontSize: "var(--t-sm)" }}><span>{h.reason === "sale" ? `Order #${h.orderNo}` : h.reason === "restore" ? `Back from #${h.orderNo}` : (h.note ?? "Adjustment")}<span className="note"> · {when(h.createdAt)}</span></span><span className="lead" /><span className="num" style={{ color: h.delta < 0 ? "var(--bad)" : "var(--ok)" }}>{h.delta > 0 ? `+${h.delta}` : h.delta}</span></li>
+                        <li key={h.id} style={{ fontSize: "var(--t-sm)" }}><span>{h.reason === "sale" ? `Order #${h.orderNo}` : h.reason === "restore" ? `Back from #${h.orderNo}` : h.reason === "edit" ? `Order #${h.orderNo} edited` : (h.note ?? "Adjustment")}<span className="note"> · {when(h.createdAt)}</span></span><span className="lead" /><span className="num" style={{ color: h.delta < 0 ? "var(--bad)" : "var(--ok)" }}>{h.delta > 0 ? `+${h.delta}` : h.delta}</span></li>
                       ))}
                     </ul>
                   )}

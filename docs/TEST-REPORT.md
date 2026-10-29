@@ -1,13 +1,13 @@
 # Zindex: test report
 
-**Run:** 29 October 2026 (after the first live deploy and the owner's own phone trial), on the developer's Windows 10 computer, Node 22, a local PostgreSQL, desktop Edge (Chromium). The web server for the browser run was started with its clock on UTC, as Vercel's is.
+**Run:** 30 October 2026 (v1.1: a discount on one item, edit and delete an order at any stage, customers by name and editable), on the developer's Windows 10 computer, Node 22, a local PostgreSQL, desktop Edge (Chromium). The web server for the browser run was started with its clock on UTC, as Vercel's is.
 
 ## Results
 
 | Suite | Result |
 |---|---|
-| API tests (Vitest, real local PostgreSQL) | **159 passed**, 0 failed, 26 test files |
-| Browser tests (Playwright, against the production build) | **78 passed**, 0 failed: 39 tests, each run at desktop 1280 px and a 375 px phone view (includes the saved-invoice-picture comparison, the tour, the demo, the customer card following the order, and the cash views) |
+| API tests (Vitest, real local PostgreSQL) | **178 passed**, 0 failed, 28 test files |
+| Browser tests (Playwright, against the production build) | **100 passed**, 0 failed: 50 tests, each run at desktop 1280 px and a 375 px phone view (includes the saved-invoice-picture comparison, the tour, the demo, the customer card following the order, and the cash views) |
 | Typecheck | web and API clean |
 | Production build (Next.js) | passes |
 | Dependency audit (`npm audit`) | 0 vulnerabilities |

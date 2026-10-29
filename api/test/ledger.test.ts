@@ -123,14 +123,16 @@ describe("paid in advance and the one-tap buttons", () => {
 });
 
 describe("rules around payments", () => {
-  it("an order with a payment cannot change its amounts until the payments are undone", async () => {
+  it("an order with a payment can still change its amounts; the payment stays and the order shows as overpaid when the total drops", async () => {
     const o = await newVerifiedOwner(t.app, t.mailer);
     const a = api(o.cookie);
     const store = await a.store();
     const order = await a.order(store, { payment: "unpaid" });
     await a.pay(store, order, { amount: 100 });
-    expect((await a.edit(store, order, { discountPercent: 10 })).body.error).toMatch(/Undo them first/);
-    expect((await a.edit(store, order, { notes: "just a note" })).status).toBe(200); // details that are not amounts are fine
+    const cut = await a.edit(store, order, { items: [{ name: "Spice", quantity: 1, unitPrice: 50 }] });
+    expect(cut.status).toBe(200);
+    expect(cut.body.order).toMatchObject({ total: 50, paid: 100 }); // 100 was paid, only 50 is owed now: overpaid by 50
+    expect((await a.edit(store, order, { notes: "just a note" })).status).toBe(200);
   });
 
   it("is private to the owner, and refuses a bad amount or a future date", async () => {

@@ -9,7 +9,7 @@ import { HttpError } from "../http-error";
 import { calculateTotals, lineDiscount } from "../invoice/totals";
 import { canMove, stages, type Stage } from "../orders/stages";
 import { createInvoice, recordInvoiceEdit } from "./invoices";
-import { deductForOrder, restoreForOrder, type StockWarning } from "../stock/ledger";
+import { adjustForEdit, deductForOrder, restoreForOrder, type StockWarning } from "../stock/ledger";
 import { normalisePhone } from "../phone";
 import { validateBody } from "../validate";
 import { idParam, storeIdOf } from "./ids";
@@ -373,8 +373,9 @@ export function ordersRouter(db: Db, config: Config): Router {
     }
   });
 
-  // Editing recalculates every total. Once an order is confirmed its items are locked (the stock
-  // has moved); everything else can still be corrected.
+  // Editing works at any stage except cancelled or returned: every total is worked out again and the status stays. If the
+  // order already took stock out, the change in items moves the stock by the difference (an 'edit' movement). Payments
+  // already recorded stay; if the new total is lower the order simply shows as overpaid.
   router.patch("/:id", validateBody(updateBody), async (req, res) => {
     const b = req.body as z.infer<typeof updateBody>;
     const storeId = storeIdOf(req);
@@ -383,11 +384,6 @@ export function ordersRouter(db: Db, config: Config): Router {
       const current = await loadOrder(tx, storeId, id);
       if (!current) throw new HttpError(404, "Order not found.");
       if (current.status === "cancelled" || current.status === "returned") throw new HttpError(409, `A ${current.status} order cannot be edited.`);
-      if (b.items && current.stockApplied) throw new HttpError(409, "The items are locked once the order is confirmed.");
-      if (current.paid > 0 && (b.items !== undefined || b.discountPercent !== undefined || b.deliveryCharge !== undefined || b.riderFee !== undefined || b.payment !== undefined)) {
-        throw new HttpError(409, "Payments are recorded on this order. Undo them first to change the amounts.");
-      }
-
       const items = b.items ? await resolveItems(tx, storeId, b.items, current.items) : current.items.map((i) => ({ productId: i.productId, name: i.name, quantity: i.quantity, unitPrice: i.unitPrice, unitCost: i.unitCost, discount: i.discountKind && i.discountValue !== null ? { kind: i.discountKind, value: i.discountValue } : null, discountAmount: i.discountAmount }));
       const v = {
         discountPercent: b.discountPercent ?? current.discountPercent,
@@ -411,7 +407,18 @@ export function ordersRouter(db: Db, config: Config): Router {
               notes = ${"notes" in b ? (b.notes ?? null) : current.notes}, updated_at = now()
             where id = ${id}`,
       );
-      if (b.items) await writeItems(tx, id, items);
+      if (b.items) {
+        if (current.stockApplied) {
+          try {
+            await adjustForEdit(tx, storeId, id, current.orderNo, current.items, items);
+          } catch (err) {
+            // 23514: the database does not know the 'edit' stock movement yet (migration 025 not run). Nothing was saved.
+            if (pgCode(err) === "23514") throw new HttpError(409, "Changing the items of a confirmed order needs the latest database update (025), which has not been run yet. Nothing was changed.");
+            throw err;
+          }
+        }
+        await writeItems(tx, id, items);
+      }
       const saved = await loadOrder(tx, storeId, id);
       await recordInvoiceEdit(tx, current, saved!);
       return saved;

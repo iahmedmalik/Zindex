@@ -111,8 +111,9 @@ export default function OrderPage() {
         <Link href="/orders" className="note" style={{ display: "inline-flex", alignItems: "center", gap: 6, textDecoration: "none" }}><Icon name="back" size={16} />Orders</Link>
         <div className="inline between">
           <h1>#{order.orderNo} · {order.customerName}</h1>
-          {closed && <span className={`badge ${order.status === "cancelled" ? "" : "bad"}`}>{stageLabel[order.status]}</span>}
+          {closed ? <span className={`badge ${order.status === "cancelled" ? "" : "bad"}`}>{stageLabel[order.status]}</span> : <Link className="btn small quiet" href={`/orders/${storeId}/${orderId}/edit`}><Icon name="edit" size={16} />Edit</Link>}
         </div>
+        {order.paid > order.expected && <p className="note" role="status"><b>Overpaid by PKR {(order.paid - order.expected).toLocaleString("en-US")}.</b> Give it back, or undo a payment below.</p>}
         <p className="note">{[order.customerPhone, order.address, store?.name, order.externalRef ? `Shopify ${order.externalRef}` : null].filter(Boolean).join(" · ")}</p>
         <div className="inline" style={{ marginTop: 6 }}>
           {order.customerPhone && <a className="iconbtn" href={`tel:${order.customerPhone}`} aria-label={`Call ${order.customerName}`}><Icon name="phone" /></a>}

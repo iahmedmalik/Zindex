@@ -67,7 +67,7 @@ describe("stock ledger", () => {
     expect(confirmed.body.stockWarnings).toEqual([{ productId: p, name: "Saffron", onHand: -3 }]);
   });
 
-  it("locks the items once confirmed, and puts stock back only when the owner approves", async () => {
+  it("moves the stock when a confirmed order's items change, and puts stock back only when the owner approves", async () => {
     const o = await newVerifiedOwner(t.app, t.mailer);
     const a = api(o.cookie);
     const store = await a.store();
@@ -75,11 +75,12 @@ describe("stock ledger", () => {
     await a.adjust(store, p, 10);
     const id = (await a.order(store, [{ productId: p, quantity: 4 }])).body.order.id as string;
     await a.status(store, id, "confirmed");
-    expect((await a.edit(store, id, { items: [{ productId: p, quantity: 1 }] })).status).toBe(409);
+    expect((await a.edit(store, id, { items: [{ productId: p, quantity: 1 }] })).status).toBe(200); // 4 -> 1: three come back
+    expect((await a.stock(store))[0]).toMatchObject({ onHand: 9, unitsSold: 1 });
     expect((await a.restore(store, id)).status).toBe(409); // not cancelled yet
 
     await a.status(store, id, "cancelled");
-    expect((await a.stock(store))[0]!.onHand).toBe(6); // cancelling alone does not restock
+    expect((await a.stock(store))[0]!.onHand).toBe(9); // cancelling alone does not restock
     const restored = await a.restore(store, id);
     expect(restored.status).toBe(200);
     expect(restored.body.restored).toBe(1);

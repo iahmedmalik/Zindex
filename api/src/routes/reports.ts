@@ -129,7 +129,7 @@ export function reportsRouter(db: Db): Router {
         tx,
         sql`select s.name as store_name, p.name, p.price, p.cost,
                    coalesce(sum(m.delta), 0)::int as on_hand,
-                   coalesce(-sum(m.delta) filter (where m.reason in ('sale', 'restore')), 0)::int as units_sold,
+                   coalesce(-sum(m.delta) filter (where m.reason in ('sale', 'restore', 'edit')), 0)::int as units_sold,
                    case when p.cost is null then null else (greatest(coalesce(sum(m.delta), 0), 0) * p.cost)::int end as value_at_cost
               from products p join stores s on s.id = p.store_id
               left join stock_movements m on m.product_id = p.id
