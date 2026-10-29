@@ -33,10 +33,11 @@ export async function createOrder(page: Page, o: { name: string; phone?: string;
   await page.getByLabel("Item name").fill("Gift box");
   await page.getByLabel(/Price of/).fill("1000");
   for (let i = 1; i < (o.qty ?? 1); i++) await page.getByRole("button", { name: /One more/ }).click();
-  if (o.kind) await page.getByRole("radio", { name: o.kind, exact: true }).check({ force: true });
+  // Tap the visible label (the radio itself is hidden, and on a phone a bar can cover it), then check it took.
+  if (o.kind) { await page.locator(".seg label", { hasText: new RegExp(`^${o.kind}$`) }).click(); await expect(page.getByRole("radio", { name: o.kind, exact: true })).toBeChecked(); }
   if (o.rider) await page.getByLabel(/Rider fee/).fill(o.rider);
   if (o.discount) await page.getByRole("button", { name: `${o.discount}%`, exact: true }).click();
-  if (o.pay && o.pay !== "COD") await page.getByRole("radio", { name: o.pay, exact: true }).check({ force: true });
+  if (o.pay && o.pay !== "COD") { await page.locator(".seg label", { hasText: new RegExp(`^${o.pay}$`) }).click(); await expect(page.getByRole("radio", { name: o.pay, exact: true })).toBeChecked(); }
   await page.getByRole("button", { name: "Create order" }).click();
   await page.waitForURL(/\/orders\/[0-9a-f-]{36}\/[0-9a-f-]{36}$/);
   await expect(page.getByRole("heading", { name: /Receipt/ })).toBeVisible();
