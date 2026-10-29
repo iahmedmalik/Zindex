@@ -82,5 +82,15 @@ export function publicCardRouter(db: Db): Router {
     res.set({ "Content-Type": photo.contentType, "Cache-Control": "no-store", "X-Robots-Tag": "noindex, nofollow", "X-Content-Type-Options": "nosniff" }).send(photo.image);
   });
 
+  // The store's logo and watermark, only while the card link is valid.
+  router.get("/:token/store-image/:kind", async (req, res) => {
+    const token = String(req.params.token);
+    const kind = String(req.params.kind);
+    if (!/^[A-Za-z0-9_-]{20,64}$/.test(token) || (kind !== "logo" && kind !== "watermark")) throw new HttpError(404, "This link is not available.");
+    const found = await db.transaction(async (tx) => rows<{ image: Buffer; contentType: string }>(tx, sql`select image, content_type from get_card_store_image(${hashOf(token)}, ${kind})`));
+    if (!found[0]) throw new HttpError(404, "There is no picture for this link.");
+    res.set({ "Content-Type": found[0].contentType, "Cache-Control": "no-store", "X-Robots-Tag": "noindex, nofollow", "X-Content-Type-Options": "nosniff" }).send(found[0].image);
+  });
+
   return router;
 }

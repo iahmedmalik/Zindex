@@ -12,6 +12,8 @@ export function Receipt({ order, store }: { order: Order; store?: Store }) {
   const contact = [store?.email, store?.phone].filter(Boolean).join(" · ");
   return (
     <div className="slip" role="group" aria-label={`Receipt for order ${order.orderNo}`}>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      {store?.logoUrl && <img className="slip-logo" src={store.logoUrl} alt="" />}
       <h4>{(store?.name ?? "Order").toUpperCase()}</h4>
       {contact && <div className="mut">{contact}</div>}
       <div className="mut">Order #{order.orderNo} · {new Date(order.createdAt).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</div>

@@ -10,7 +10,7 @@ const API_URL = process.env.API_URL ?? "http://127.0.0.1:4000";
 const fmt = (n: number) => n.toLocaleString("en-US");
 
 type Card = {
-  store: { name: string; phone: string | null; email: string | null; address: string | null; logoUrl: string | null; accent: string };
+  store: { name: string; phone: string | null; email: string | null; address: string | null; logoUrl: string | null; hasLogo?: boolean; accent: string };
   order: { orderNo: number; status: string; customerName: string; address: string | null; payment: string; items: { name: string; quantity: number }[]; subtotal: number; discount: number; deliveryCharge: number; total: number; riderFee: number; codAmount: number; collectAtDoor: number; paid: number };
   delivery: { service: string | null; riderName: string | null; riderPhone: string | null; bikeNumber: string | null; riderPhotoUrl: string | null; hasPhoto: boolean; riderPhotoTakenAt: string | null; trackingUrl: string | null; riderScreenshotUrl: string | null } | null;
   expiresAt: string;
@@ -64,7 +64,11 @@ export default async function CardPage({ params }: { params: Promise<{ token: st
     <div className="dcard" style={{ ["--store-base" as string]: store.accent }}>
       <main className="card-page" style={{ maxWidth: 480, gap: 18, paddingBottom: 40 }}>
         <header className="arrive">
-          <p className="lbl">{store.name}{store.phone ? ` · ${store.phone}` : ""}</p>
+          <div className="brandline">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            {store.hasLogo && <img className="card-logo" src={`/backend/v1/public/card/${encodeURIComponent(token)}/store-image/logo`} alt="" />}
+            <p className="lbl">{store.name}{store.phone ? ` · ${store.phone}` : ""}</p>
+          </div>
           <p className="note-on">Order #{order.orderNo} for {first}</p>
         </header>
 

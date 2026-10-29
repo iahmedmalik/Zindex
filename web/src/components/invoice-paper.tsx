@@ -2,7 +2,7 @@ import { forwardRef } from "react";
 import { pkr } from "@/lib/format";
 import type { Invoice, Order, Store } from "@/lib/types";
 
-export type InvoiceStore = Pick<Store, "name" | "phone" | "email" | "address" | "logoUrl" | "accent">;
+export type InvoiceStore = Pick<Store, "name" | "phone" | "email" | "address" | "logoUrl" | "accent"> & Partial<Pick<Store, "watermarkUrl" | "watermarkOn">>;
 
 const n = (v: number) => v.toLocaleString("en-US");
 
@@ -96,7 +96,7 @@ export const InvoicePaper = forwardRef<HTMLElement, { invoice: Invoice; order: O
         </svg>
         <div className="iv-id">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <span className="iv-mark">{store.logoUrl ? <img src={store.logoUrl} alt="" /> : store.name.slice(0, 1).toUpperCase()}</span>
+          <span className={`iv-mark${store.logoUrl ? " logo" : ""}`}>{store.logoUrl ? <img src={store.logoUrl} alt="" /> : store.name.slice(0, 1).toUpperCase()}</span>
           <div><h2>{store.name}</h2>{contact && <small>{contact}</small>}</div>
         </div>
         <div className="iv-meta">
@@ -106,9 +106,11 @@ export const InvoicePaper = forwardRef<HTMLElement, { invoice: Invoice; order: O
         </div>
       </div>
       <div className="iv-sheet">
-        <svg className="iv-wm" viewBox="0 0 400 300" preserveAspectRatio="xMidYMid slice" fill="none" aria-hidden="true">
+        {store.watermarkUrl && store.watermarkOn !== false
+          ? /* eslint-disable-next-line @next/next/no-img-element */ <img className="iv-wmimg" src={store.watermarkUrl} alt="" />
+          : <svg className="iv-wm" viewBox="0 0 400 300" preserveAspectRatio="xMidYMid slice" fill="none" aria-hidden="true">
           <g stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M-10 70H120L160 110H300L340 70H420" /><path d="M-10 190H90L140 140H250L290 180H420" /><path d="M60 -10V80L100 120V230L140 270V320" /><path d="M330 -10V60L290 100V200L330 240V320" /></g>
-        </svg>
+        </svg>}
         {compact ? customer : (
           <div className="iv-cols">
             {customer}

@@ -1,6 +1,6 @@
 // The shapes the API returns (see api/src/routes). Only what the screens use.
 
-export type Store = { id: string; name: string; phone: string | null; email: string | null; address: string | null; logoUrl: string | null; accent: string; invoicePrefix: string };
+export type Store = { id: string; name: string; phone: string | null; email: string | null; address: string | null; logoUrl: string | null; watermarkUrl: string | null; watermarkOn: boolean; accent: string; invoicePrefix: string };
 
 export type Stage = "pending" | "confirmed" | "packed" | "out_for_delivery" | "delivered" | "returned" | "cancelled";
 export type Payment = "paid" | "cod" | "unpaid";

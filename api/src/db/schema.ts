@@ -1,4 +1,4 @@
-import { boolean, index, integer, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { bigint, boolean, index, integer, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 
 // These mirror the tables created by the numbered files in api/sql (the SQL files are the
 // source of truth; this file gives the code its types).
@@ -79,6 +79,9 @@ export const stores = pgTable(
     email: text("email"),
     address: text("address"),
     logoUrl: text("logo_url"),
+    logoVersion: bigint("logo_version", { mode: "number" }),
+    watermarkVersion: bigint("watermark_version", { mode: "number" }),
+    watermarkOn: boolean("watermark_on").notNull().default(true),
     accent: text("accent").notNull().default("#5d1b23"),
     invoicePrefix: text("invoice_prefix").notNull().default("INV"),
     nextInvoiceNo: integer("next_invoice_no").notNull().default(1),

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { DoneButton, Icon, Seg, useToast } from "@/components/ui";
 import { api, messageOf } from "@/lib/api";
 import { accents, load as loadLook, save as saveLook, type Accent, type Appearance } from "@/lib/appearance";
+import { shrinkPicture, uploadPhoto } from "@/lib/image";
 import { useSession } from "@/lib/session";
 import type { Store } from "@/lib/types";
 
@@ -14,7 +15,47 @@ type ImportResult = { imported: { ref: string; orderNo: number }[]; alreadyImpor
 const storeColours = ["#5d1b23", "#8a3b12", "#1f3a5f", "#24523b", "#6b3a8a", "#2b2b2b"];
 const templateNames: Record<string, string> = { order_confirmed: "Order confirmed", invoice: "Invoice", rider_assigned: "Rider assigned", on_the_way: "On the way", delivered: "Delivered", payment_reminder: "Payment reminder", thank_you: "Thank you" };
 
-function StoreEditor({ store, onSaved }: { store?: Store; onSaved: () => Promise<void> }) {
+/** Logo or watermark: a small picture per store, shrunk here first, shown on the invoice, receipt and the customer's card. */
+function PictureRow({ store, kind, onSaved }: { store: Store; kind: "logo" | "watermark"; onSaved: () => Promise<void> }) {
+  const toast = useToast();
+  const [busy, setBusy] = useState(false);
+  const url = kind === "logo" ? store.logoUrl : store.watermarkUrl;
+  const words = kind === "logo"
+    ? { title: "Logo", has: "Shown on the invoice, the receipt and the customer's card.", none: "Optional. A square picture on a plain background works best." }
+    : { title: "Watermark", has: store.watermarkOn ? "Shown faint behind the invoice." : "Saved, but switched off.", none: "Optional. A faint picture behind the invoice, such as your logo or a pattern." };
+  async function run(fn: () => Promise<unknown>, done: string) {
+    setBusy(true);
+    try { await fn(); await onSaved(); toast(done); } catch (err) { toast(messageOf(err), "bad"); } finally { setBusy(false); }
+  }
+  return (
+    <div className="photo-row">
+      <span className="photo-ic" aria-hidden="true" style={{ overflow: "hidden" }}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        {url ? <img src={url} alt="" style={{ width: "100%", height: "100%", objectFit: "contain" }} /> : <Icon name="camera" size={22} />}
+      </span>
+      <span className="grow"><b>{words.title}</b><br /><span className="note">{url ? words.has : words.none}</span></span>
+      <span className="inline" style={{ gap: 12 }}>
+      <label className="btn small quiet" style={{ cursor: "pointer" }}>
+        <input type="file" accept="image/*" className="sr" aria-label={`${url ? "Replace" : "Add"} ${words.title.toLowerCase()}`} disabled={busy} onChange={async (e) => {
+          const file = e.target.files?.[0];
+          e.target.value = "";
+          if (!file) return;
+          await run(async () => { await uploadPhoto(`/stores/${store.id}/images/${kind}`, await shrinkPicture(file, kind === "logo" ? 512 : 1000)); }, `${words.title} saved`);
+        }} />{url ? "Replace" : "Add"}
+      </label>
+      {url && <button type="button" className="linkbtn" disabled={busy} onClick={() => run(() => api(`/stores/${store.id}/images/${kind}`, { method: "DELETE" }), `${words.title} removed`)}>Remove</button>}
+      </span>
+      {kind === "watermark" && url && (
+        <label className="inline" style={{ gap: 8, flexBasis: "100%" }}>
+          <input type="checkbox" checked={store.watermarkOn} disabled={busy} onChange={(e) => run(() => api(`/stores/${store.id}`, { method: "PATCH", body: { watermarkOn: e.target.checked } }), e.target.checked ? "Watermark on" : "Watermark off")} />
+          <span>Show the watermark on invoices</span>
+        </label>
+      )}
+    </div>
+  );
+}
+
+function StoreEditor({ store, onSaved, onPicture }: { store?: Store; onSaved: () => Promise<void>; onPicture?: () => Promise<void> }) {
   const toast = useToast();
   const [f, setF] = useState({ name: store?.name ?? "", invoicePrefix: store?.invoicePrefix ?? "", phone: store?.phone ?? "", email: store?.email ?? "", address: store?.address ?? "", accent: store?.accent ?? storeColours[0]! });
   return (
@@ -45,6 +86,8 @@ function StoreEditor({ store, onSaved }: { store?: Store; onSaved: () => Promise
           {storeColours.map((c) => <button type="button" key={c} role="radio" aria-checked={f.accent === c} aria-label={c} onClick={() => setF({ ...f, accent: c })} style={{ width: 44, height: 44, borderRadius: 12, background: c, border: 0, cursor: "pointer", boxShadow: f.accent === c ? "0 0 0 3px var(--paper), 0 0 0 5px var(--ink)" : "none", transition: "box-shadow var(--t-base) var(--ease)" }} />)}
         </div>
       </div>
+      {store && <PictureRow store={store} kind="logo" onSaved={onPicture ?? onSaved} />}
+      {store && <PictureRow store={store} kind="watermark" onSaved={onPicture ?? onSaved} />}
       <button className="btn" style={{ justifySelf: "start" }}>{store ? "Save store" : "Add store"}</button>
     </form>
   );
@@ -87,7 +130,7 @@ export default function SettingsPage() {
                 <span><span className="ttl">{s.name}</span><br /><span className="meta num">{s.invoicePrefix}-0001 · {s.phone ?? "no WhatsApp number"}</span></span>
                 <button className="btn small quiet" aria-expanded={editing === s.id} onClick={() => setEditing(editing === s.id ? null : s.id)}>{editing === s.id ? "Close" : "Edit"}</button>
               </div>
-              <div className={`expand${editing === s.id ? " open" : ""}`}><div style={{ padding: "8px 0 20px" }}>{editing === s.id && <StoreEditor store={s} onSaved={async () => { await reload(); setEditing(null); }} />}</div></div>
+              <div className={`expand${editing === s.id ? " open" : ""}`}><div style={{ padding: "8px 0 20px" }}>{editing === s.id && <StoreEditor store={s} onSaved={async () => { await reload(); setEditing(null); }} onPicture={reload} />}</div></div>
             </li>
           ))}
         </ul>

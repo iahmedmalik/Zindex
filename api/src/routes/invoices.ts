@@ -6,6 +6,7 @@ import { HttpError } from "../http-error";
 import { normalisePhone } from "../phone";
 import { idParam, storeIdOf } from "./ids";
 import { loadOrder, type Order } from "./orders";
+import { withPictures } from "./stores";
 
 type Invoice = { id: string; orderId: string; storeId: string; status: "draft" | "final"; number: string | null; finalisedAt: Date | null; createdAt: Date };
 const invoiceCols = sql`id, order_id, store_id, status, number, finalised_at, created_at`;
@@ -59,9 +60,9 @@ async function loadInvoice(tx: Tx, storeId: string, orderId: string) {
   const [invoice] = await rows<Invoice>(tx, sql`select ${invoiceCols} from invoices where order_id = ${orderId} and store_id = ${storeId}`);
   if (!invoice) return undefined;
   const order = await loadOrder(tx, storeId, orderId);
-  const [store] = await rows(tx, sql`select name, phone, email, address, logo_url, accent from stores where id = ${storeId}`);
+  const [store] = await rows(tx, sql`select id, name, phone, email, address, logo_version as "logoVersion", watermark_version as "watermarkVersion", watermark_on as "watermarkOn", accent from stores where id = ${storeId}`);
   const edits = await rows(tx, sql`select id, changed, before, after, created_at from invoice_edits where invoice_id = ${invoice.id} order by created_at`);
-  return { invoice, order, store, edits };
+  return { invoice, order, store: store && withPictures(store as never), edits };
 }
 
 // Mounted at /v1/stores/:storeId/orders/:orderId/invoice
