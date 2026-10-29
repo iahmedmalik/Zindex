@@ -234,3 +234,6 @@
 
 .demo-note span { font-size: var(--t-xs); } .demo-note .linkbtn { min-height: 36px; padding: 0 10px; flex: none; }
 .tour-actions .btn:first-of-type { margin-left: 0; }
+
+/* An item with a discount shows what it was, struck through, before what it is now (receipt and invoice). */
+.ivp .iv-amt s, .slip .num s { opacity: 0.55; margin-right: 7px; font-weight: 400; }

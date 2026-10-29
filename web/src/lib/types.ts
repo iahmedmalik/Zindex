@@ -6,7 +6,8 @@ export type Stage = "pending" | "confirmed" | "packed" | "out_for_delivery" | "d
 export type Payment = "paid" | "cod" | "unpaid";
 export type DeliveryKind = "local" | "courier" | "pickup";
 
-export type OrderItem = { id: string; productId: string | null; name: string; quantity: number; unitPrice: number; unitCost: number | null };
+export type ItemDiscount = { kind: "percent" | "amount"; value: number };
+export type OrderItem = { id: string; productId: string | null; name: string; quantity: number; unitPrice: number; unitCost: number | null; discountKind: ItemDiscount["kind"] | null; discountValue: number | null; discountAmount: number };
 
 export type Order = {
   id: string;

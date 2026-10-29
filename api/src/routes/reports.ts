@@ -43,8 +43,8 @@ export function reportsRouter(db: Db): Router {
         sql`select s.id as store_id, s.name,
                    count(o.id)::int as orders,
                    count(o.id) filter (where o.status = 'returned')::int as returned,
-                   coalesce(sum(o.subtotal), 0)::int as gross,
-                   coalesce(sum(o.discount), 0)::int as discounts,
+                   coalesce(sum(o.subtotal + ld.n), 0)::int as gross, -- goods before any discount (the lines' own discounts are added back)
+                   coalesce(sum(o.discount + ld.n), 0)::int as discounts, -- the order discount plus the discounts on single items
                    coalesce(sum(o.delivery_charge), 0)::int as delivery_fees,
                    coalesce(sum(o.total) filter (where o.status <> 'returned'), 0)::int as net_sales,
                    coalesce(sum(o.total) filter (where o.status = 'returned'), 0)::int as returned_value,
@@ -60,14 +60,15 @@ export function reportsRouter(db: Db): Router {
                    coalesce((select count(*) from order_items i join orders o2 on o2.id = i.order_id
                               where o2.store_id = s.id and o2.status not in ('cancelled', 'returned') and i.unit_cost is null
                                 and (o2.created_at at time zone 'Asia/Karachi')::date between ${from}::date and ${to}::date), 0)::int as lines_without_cost,
-                   coalesce((select round(sum(i.quantity * i.unit_price * (o2.subtotal - o2.discount)::numeric / nullif(o2.subtotal, 0))) from order_items i join orders o2 on o2.id = i.order_id
+                   coalesce((select round(sum((i.quantity * i.unit_price - i.discount_amount) * (o2.subtotal - o2.discount)::numeric / nullif(o2.subtotal, 0))) from order_items i join orders o2 on o2.id = i.order_id
                               where o2.store_id = s.id and o2.status not in ('cancelled', 'returned') and i.unit_cost is not null
                                 and (o2.created_at at time zone 'Asia/Karachi')::date between ${from}::date and ${to}::date), 0)::int as sales_with_cost,
-                   coalesce((select round(sum(i.quantity * i.unit_price * (o2.subtotal - o2.discount)::numeric / nullif(o2.subtotal, 0))) from order_items i join orders o2 on o2.id = i.order_id
+                   coalesce((select round(sum((i.quantity * i.unit_price - i.discount_amount) * (o2.subtotal - o2.discount)::numeric / nullif(o2.subtotal, 0))) from order_items i join orders o2 on o2.id = i.order_id
                               where o2.store_id = s.id and o2.status not in ('cancelled', 'returned') and i.unit_cost is null
                                 and (o2.created_at at time zone 'Asia/Karachi')::date between ${from}::date and ${to}::date), 0)::int as sales_without_cost
               from stores s
               left join orders o on o.store_id = s.id and ${inRange}
+              left join lateral (select coalesce(sum(i.discount_amount), 0)::int as n from order_items i where i.order_id = o.id) ld on true
               left join deliveries d on d.order_id = o.id
              where (${storeId}::uuid is null or s.id = ${storeId}::uuid)
              group by s.id order by s.created_at`,
@@ -77,7 +78,7 @@ export function reportsRouter(db: Db): Router {
       for (const s of stores) Object.assign(s, withProfit(s));
       const bestSellers = await rows<{ storeName: string; name: string; quantity: number; amount: number }>(
         tx,
-        sql`select s.name as store_name, i.name, sum(i.quantity)::int as quantity, sum(i.quantity * i.unit_price)::int as amount
+        sql`select s.name as store_name, i.name, sum(i.quantity)::int as quantity, sum(i.quantity * i.unit_price - i.discount_amount)::int as amount
               from order_items i join orders o on o.id = i.order_id join stores s on s.id = o.store_id
              where ${inRange} and o.status <> 'returned'
              group by s.name, i.name order by quantity desc, amount desc limit 10`,

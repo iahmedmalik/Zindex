@@ -32,7 +32,7 @@ export function costsRouter(db: Db): Router {
       return rows<{ productId: string | null; name: string; lines: number; units: number; sales: number; lastSold: Date; currentCost: number | null }>(
         tx,
         sql`select i.product_id, max(i.name) as name, count(*)::int as lines, sum(i.quantity)::int as units,
-                   coalesce(round(sum(i.quantity * i.unit_price * (o.subtotal - o.discount)::numeric / nullif(o.subtotal, 0))), 0)::int as sales,
+                   coalesce(round(sum((i.quantity * i.unit_price - i.discount_amount) * (o.subtotal - o.discount)::numeric / nullif(o.subtotal, 0))), 0)::int as sales,
                    max(o.created_at) as last_sold, max(p.cost) as current_cost
               from order_items i
               join orders o on o.id = i.order_id

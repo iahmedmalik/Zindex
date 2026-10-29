@@ -2,13 +2,14 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { DiscountCard } from "@/components/discount-card";
 import { Count, Icon, Seg, useToast } from "@/components/ui";
 import { api, messageOf } from "@/lib/api";
-import { previewTotals } from "@/lib/format";
+import { lineOff, offLabel, previewTotals } from "@/lib/format";
 import { useSession } from "@/lib/session";
-import type { Customer, DeliveryKind, Order, Payment, Product } from "@/lib/types";
+import type { Customer, DeliveryKind, ItemDiscount, Order, Payment, Product } from "@/lib/types";
 
-type Line = { key: string; productId?: string; name: string; quantity: number; unitPrice: number; unitCost: number | null };
+type Line = { key: string; productId?: string; name: string; quantity: number; unitPrice: number; unitCost: number | null; discount?: ItemDiscount | null };
 const methods = ["Cash", "Easypaisa", "JazzCash", "Bank transfer"];
 const digits = (v: string) => Number(v.replace(/\D/g, "")) || 0;
 
@@ -29,6 +30,8 @@ export default function NewOrderPage() {
   const picked = useRef(""); // the customer just tapped, so the matches do not reopen for their own name and number
   const [flash, setFlash] = useState(0);
   const [lines, setLines] = useState<Line[]>([]);
+  const [discounting, setDiscounting] = useState<string | null>(null); // the line the discount card is for (kept while the card fades out)
+  const [discountOpen, setDiscountOpen] = useState(false);
   const [discount, setDiscount] = useState(0);
   const [kind, setKind] = useState<DeliveryKind>("local");
   const [riderFee, setRiderFee] = useState("");
@@ -80,7 +83,11 @@ export default function NewOrderPage() {
           customerName: name.trim(),
           customerPhone: phone.trim() || undefined,
           address: address.trim() || null,
-          items: lines.map((l) => (l.productId ? { productId: l.productId, quantity: l.quantity, unitPrice: l.unitPrice, unitCost: l.unitCost } : { name: l.name.trim() || "Item", quantity: l.quantity, unitPrice: l.unitPrice, unitCost: l.unitCost })),
+          items: lines.map((l) => {
+            // A rupee discount can never be more than the line, even after the quantity or price was lowered.
+            const discount = l.discount && lineOff(l) > 0 ? (l.discount.kind === "amount" ? { kind: "amount", value: lineOff(l) } : l.discount) : null;
+            return l.productId ? { productId: l.productId, quantity: l.quantity, unitPrice: l.unitPrice, unitCost: l.unitCost, discount } : { name: l.name.trim() || "Item", quantity: l.quantity, unitPrice: l.unitPrice, unitCost: l.unitCost, discount };
+          }),
           discountPercent: discount,
           deliveryKind: kind,
           riderFee: fee,
@@ -157,9 +164,19 @@ export default function NewOrderPage() {
                 <label className="field"><span>Price per pc{l.productId && products.find((p) => p.id === l.productId)?.price !== l.unitPrice ? " · this order only" : ""}</span><input className="input num" inputMode="numeric" aria-label={`Price of ${l.name || "item"} per pc`} style={{ minHeight: 38, padding: "6px 10px" }} value={l.unitPrice || ""} placeholder="0" onChange={(e) => change(l.key, { unitPrice: digits(e.target.value) })} /></label>
                 <label className="field"><span>Cost per pc (optional)</span><input className="input num" inputMode="numeric" aria-label={`Cost of ${l.name || "item"} per pc`} style={{ minHeight: 38, padding: "6px 10px" }} value={l.unitCost ?? ""} placeholder="not set" onChange={(e) => change(l.key, { unitCost: e.target.value.replace(/\D/g, "") === "" ? null : digits(e.target.value) })} /></label>
               </div>
+              <div className="between inline" style={{ gridColumn: "1 / -1" }}>
+                <button type="button" className={`disc-chip${l.discount ? " set" : ""}`} onClick={() => { setDiscounting(l.key); setDiscountOpen(true); }}>
+                  {l.discount ? <>{offLabel(l.discount)} · − {lineOff(l).toLocaleString("en-US")}<Icon name="edit" size={14} /></> : <><Icon name="plus" size={14} />Add discount</>}
+                </button>
+                <span className="num"><b>{(l.quantity * l.unitPrice - lineOff(l)).toLocaleString("en-US")}</b></span>
+              </div>
             </li>
           ))}
         </ul>
+        {(() => {
+          const l = lines.find((x) => x.key === discounting);
+          return <DiscountCard open={discountOpen && !!l} onClose={() => setDiscountOpen(false)} name={l?.name ?? ""} quantity={l?.quantity ?? 1} unitPrice={l?.unitPrice ?? 0} value={l?.discount ?? null} onApply={(d) => l && change(l.key, { discount: d })} />;
+        })()}
       </section>
 
       <section className="section">

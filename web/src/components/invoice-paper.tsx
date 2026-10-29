@@ -1,5 +1,5 @@
 import { forwardRef } from "react";
-import { pkr } from "@/lib/format";
+import { offLabel, pkr } from "@/lib/format";
 import type { Invoice, Order, Store } from "@/lib/types";
 
 export type InvoiceStore = Pick<Store, "name" | "phone" | "email" | "address" | "logoUrl" | "accent"> & Partial<Pick<Store, "watermarkUrl" | "watermarkOn">>;
@@ -52,8 +52,8 @@ export const InvoicePaper = forwardRef<HTMLElement, { invoice: Invoice; order: O
       {order.items.map((i) => (
         <div className="iv-it" key={i.id}>
           <span className="iv-q">{i.quantity}</span>
-          <div><b>{i.name}</b><small>{pkr(i.unitPrice)} each</small></div>
-          <span className="iv-amt">{n(i.quantity * i.unitPrice)}</span>
+          <div><b>{i.name}</b><small>{pkr(i.unitPrice)} each{i.discountKind && i.discountValue ? ` · ${offLabel({ kind: i.discountKind, value: i.discountValue })}` : ""}</small></div>
+          <span className="iv-amt">{i.discountAmount > 0 && <s>{n(i.quantity * i.unitPrice)}</s>}{n(i.quantity * i.unitPrice - i.discountAmount)}</span>
         </div>
       ))}
     </div>

@@ -6,7 +6,7 @@ import type { Config } from "../config";
 import { asOwner, type Db, type Tx } from "../db/client";
 import { pgCode, rows, textArray } from "../db/query";
 import { HttpError } from "../http-error";
-import { calculateTotals } from "../invoice/totals";
+import { calculateTotals, lineDiscount } from "../invoice/totals";
 import { canMove, stages, type Stage } from "../orders/stages";
 import { createInvoice, recordInvoiceEdit } from "./invoices";
 import { deductForOrder, restoreForOrder, type StockWarning } from "../stock/ledger";
@@ -25,6 +25,8 @@ const itemBody = z
     // The cost of one piece, optional. Left out, a product line takes the product's cost as it is today and a typed
     // line has none (unknown): it is left out of profit until the owner fills it in.
     unitCost: money.nullable().optional(),
+    // A discount on this one item: a percent of the line, or rupees off the whole line (quantity x price).
+    discount: z.object({ kind: z.enum(["percent", "amount"]), value: money }).strict().nullable().optional(),
   })
   .strict();
 
@@ -68,7 +70,8 @@ const createBody = z
 const updateBody = createBody.omit({ idempotencyKey: true, source: true }).partial().strict();
 const statusBody = z.object({ status: z.enum(stages) }).strict();
 
-export type OrderItem = { id: string; productId: string | null; name: string; quantity: number; unitPrice: number; unitCost: number | null };
+export type ItemDiscount = { kind: "percent" | "amount"; value: number };
+export type OrderItem = { id: string; productId: string | null; name: string; quantity: number; unitPrice: number; unitCost: number | null; discountKind: ItemDiscount["kind"] | null; discountValue: number | null; discountAmount: number };
 export type Order = {
   id: string;
   storeId: string;
@@ -112,7 +115,8 @@ const orderSelect = sql`
   case when o.payment = 'cod' then o.cod_amount else o.total end as expected,
   coalesce((select sum(p.amount) from order_payments p where p.order_id = o.id), 0)::int as paid,
   coalesce((select json_agg(json_build_object('id', i.id, 'productId', i.product_id, 'name', i.name,
-                                              'quantity', i.quantity, 'unitPrice', i.unit_price, 'unitCost', i.unit_cost) order by i.position)
+                                              'quantity', i.quantity, 'unitPrice', i.unit_price, 'unitCost', i.unit_cost,
+                                              'discountKind', i.discount_kind, 'discountValue', i.discount_value, 'discountAmount', i.discount_amount) order by i.position)
               from order_items i where i.order_id = o.id), '[]'::json) as items`;
 
 export async function loadOrder(tx: Tx, storeId: string, id: string): Promise<Order | undefined> {
@@ -121,7 +125,7 @@ export async function loadOrder(tx: Tx, storeId: string, id: string): Promise<Or
 }
 
 type ItemInput = z.infer<typeof itemBody>;
-type Resolved = { productId: string | null; name: string; quantity: number; unitPrice: number; unitCost: number | null };
+type Resolved = { productId: string | null; name: string; quantity: number; unitPrice: number; unitCost: number | null; discount: ItemDiscount | null; discountAmount: number };
 
 // Items can name a product (name, price and cost come from the store's catalogue unless overridden)
 // or be typed by hand (name and price required, cost optional).
@@ -131,16 +135,25 @@ type Resolved = { productId: string | null; name: string; quantity: number; unit
 async function resolveItems(tx: Tx, storeId: string, items: ItemInput[], previous: OrderItem[] = []): Promise<Resolved[]> {
   const out: Resolved[] = [];
   for (const item of items) {
+    let line: Omit<Resolved, "discount" | "discountAmount">;
     if (item.productId) {
       const [p] = await rows<{ name: string; price: number; cost: number | null }>(tx, sql`select name, price, cost from products where id = ${item.productId} and store_id = ${storeId}`);
       if (!p) throw new HttpError(400, "One of the products is not in this store.");
       const kept = previous.find((l) => l.productId === item.productId && l.unitCost !== null);
-      out.push({ productId: item.productId, name: item.name ?? p.name, quantity: item.quantity, unitPrice: item.unitPrice ?? p.price, unitCost: item.unitCost !== undefined ? item.unitCost : (kept?.unitCost ?? p.cost) });
+      line = { productId: item.productId, name: item.name ?? p.name, quantity: item.quantity, unitPrice: item.unitPrice ?? p.price, unitCost: item.unitCost !== undefined ? item.unitCost : (kept?.unitCost ?? p.cost) };
     } else {
       if (!item.name || item.unitPrice === undefined) throw new HttpError(400, "A typed item needs a name and a price.");
       const kept = previous.find((l) => l.productId === null && l.name === item.name && l.unitCost !== null);
-      out.push({ productId: null, name: item.name, quantity: item.quantity, unitPrice: item.unitPrice, unitCost: item.unitCost !== undefined ? item.unitCost : (kept?.unitCost ?? null) });
+      line = { productId: null, name: item.name, quantity: item.quantity, unitPrice: item.unitPrice, unitCost: item.unitCost !== undefined ? item.unitCost : (kept?.unitCost ?? null) };
     }
+    const discount = item.discount && item.discount.value > 0 ? item.discount : null;
+    let discountAmount = 0;
+    try {
+      discountAmount = lineDiscount({ quantity: line.quantity, unitPrice: line.unitPrice, discount });
+    } catch (err) {
+      throw new HttpError(400, `${line.name}: ${err instanceof Error ? err.message : "the discount is not valid."}`);
+    }
+    out.push({ ...line, discount, discountAmount });
   }
   return out;
 }
@@ -148,7 +161,7 @@ async function resolveItems(tx: Tx, storeId: string, items: ItemInput[], previou
 function totalsFor(items: Resolved[], v: { discountPercent: number; deliveryCharge: number; riderFee: number; payment: "paid" | "cod" | "unpaid" }) {
   try {
     return calculateTotals({
-      lines: items.map((i) => ({ quantity: i.quantity, unitPrice: i.unitPrice })),
+      lines: items.map((i) => ({ quantity: i.quantity, unitPrice: i.unitPrice, discount: i.discount })),
       discount: v.discountPercent > 0 ? { kind: "percent", percent: v.discountPercent } : { kind: "none" },
       deliveryCharge: v.deliveryCharge,
       riderFee: v.riderFee,
@@ -190,7 +203,8 @@ async function writeItems(tx: Tx, orderId: string, items: Resolved[]) {
   await tx.execute(sql`delete from order_items where order_id = ${orderId}`);
   for (const [position, i] of items.entries()) {
     await tx.execute(
-      sql`insert into order_items (order_id, product_id, position, name, quantity, unit_price, unit_cost) values (${orderId}, ${i.productId}, ${position}, ${i.name}, ${i.quantity}, ${i.unitPrice}, ${i.unitCost})`,
+      sql`insert into order_items (order_id, product_id, position, name, quantity, unit_price, unit_cost, discount_kind, discount_value, discount_amount)
+          values (${orderId}, ${i.productId}, ${position}, ${i.name}, ${i.quantity}, ${i.unitPrice}, ${i.unitCost}, ${i.discount?.kind ?? null}, ${i.discount?.value ?? null}, ${i.discountAmount})`,
     );
   }
 }
@@ -374,7 +388,7 @@ export function ordersRouter(db: Db, config: Config): Router {
         throw new HttpError(409, "Payments are recorded on this order. Undo them first to change the amounts.");
       }
 
-      const items = b.items ? await resolveItems(tx, storeId, b.items, current.items) : current.items.map((i) => ({ productId: i.productId, name: i.name, quantity: i.quantity, unitPrice: i.unitPrice, unitCost: i.unitCost }));
+      const items = b.items ? await resolveItems(tx, storeId, b.items, current.items) : current.items.map((i) => ({ productId: i.productId, name: i.name, quantity: i.quantity, unitPrice: i.unitPrice, unitCost: i.unitCost, discount: i.discountKind && i.discountValue !== null ? { kind: i.discountKind, value: i.discountValue } : null, discountAmount: i.discountAmount }));
       const v = {
         discountPercent: b.discountPercent ?? current.discountPercent,
         deliveryCharge: b.deliveryCharge ?? current.deliveryCharge,

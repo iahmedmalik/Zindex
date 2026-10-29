@@ -362,7 +362,7 @@ main li > a:not(.row):not(.tile):not(.btn), main > a.note, .page > a.note { disp
    the page blurred behind it. Same easing and travel as everything else; it leaves faster than it arrives. */
 .dlg-scrim { position: fixed; inset: 0; z-index: 60; display: flex; align-items: flex-end; justify-content: center; background: rgb(21 14 16 / 0); backdrop-filter: blur(0); -webkit-backdrop-filter: blur(0); transition: background var(--t-exit) var(--ease-out), backdrop-filter var(--t-exit) var(--ease-out), -webkit-backdrop-filter var(--t-exit) var(--ease-out); }
 .dlg-scrim.on { background: rgb(21 14 16 / 0.4); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); transition-duration: var(--t-base); transition-timing-function: var(--ease); }
-.dlg { width: min(100%, 460px); display: grid; gap: 14px; padding: 22px 20px calc(22px + env(safe-area-inset-bottom)); border-radius: var(--r-lg) var(--r-lg) 0 0; background: var(--surface); color: var(--ink); box-shadow: var(--shadow-sheet); opacity: 0; transform: translateY(calc(var(--travel) * 3)); transition: opacity var(--t-exit) var(--ease-out), transform var(--t-exit) var(--ease-out); }
+.dlg { width: min(100%, 460px); display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; padding: 22px 20px calc(22px + env(safe-area-inset-bottom)); border-radius: var(--r-lg) var(--r-lg) 0 0; background: var(--surface); color: var(--ink); box-shadow: var(--shadow-sheet); opacity: 0; transform: translateY(calc(var(--travel) * 3)); transition: opacity var(--t-exit) var(--ease-out), transform var(--t-exit) var(--ease-out); }
 .dlg-scrim.on .dlg { opacity: 1; transform: none; transition: opacity var(--t-base) var(--ease), transform var(--t-enter) var(--ease); }
 .dlg-actions { display: grid; grid-template-columns: 1fr 1.4fr; gap: 10px; }
 .btn.danger-solid { background: var(--bad); border-color: var(--bad); color: #fff; }
@@ -371,3 +371,17 @@ main li > a:not(.row):not(.tile):not(.btn), main > a.note, .page > a.note { disp
   .dlg-scrim { align-items: center; padding: 24px; }
   .dlg { border-radius: var(--r-lg); padding-bottom: 22px; box-shadow: var(--shadow-pop); transform: translateY(var(--travel)) scale(0.98); }
 }
+
+/* The item discount card (inside .dlg). */
+.dc-amt { display: flex; align-items: center; gap: 8px; border: 1px solid var(--line); border-radius: var(--r-md); padding: 4px 14px; background: var(--paper); transition: border-color var(--t-base) var(--ease); }
+.dc-amt:focus-within { border-color: var(--brand-hi); }
+.dc-amt > span { font: 600 var(--t-lg) var(--font-display); color: var(--ink-2); }
+.dc-amt input { flex: 1; min-width: 0; border: 0; background: none; font: 600 1.75rem var(--font-display); color: var(--ink); padding: 8px 0; outline: none; font-variant-numeric: tabular-nums; }
+.dc-quick { display: flex; flex-wrap: wrap; gap: 8px; }
+.dc-pre { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; color: var(--ink-2); }
+.dc-pre b { color: var(--ink); font: 700 var(--t-lg) var(--font-display); font-variant-numeric: tabular-nums; }
+.dc-pre small { font-weight: 500; color: var(--ink-2); }
+/* The chip on an order line that opens the card. */
+.disc-chip { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 14px; border-radius: var(--r-pill); border: 1px dashed var(--brand-fg); background: none; color: var(--brand-fg); font: 600 var(--t-sm) var(--font); cursor: pointer; transition: transform var(--t-press) var(--ease), background var(--t-base) var(--ease); }
+.disc-chip:active { transform: scale(0.96); }
+.disc-chip.set { border-style: solid; background: color-mix(in srgb, var(--brand-fg) 10%, transparent); }

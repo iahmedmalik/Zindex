@@ -1,4 +1,4 @@
-import { pkr, stageLabel } from "@/lib/format";
+import { offLabel, pkr, stageLabel } from "@/lib/format";
 import type { Order, Store } from "@/lib/types";
 
 const n = (x: number) => x.toLocaleString("en-US");
@@ -18,7 +18,12 @@ export function Receipt({ order, store }: { order: Order; store?: Store }) {
       {contact && <div className="mut">{contact}</div>}
       <div className="mut">Order #{order.orderNo} · {new Date(order.createdAt).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</div>
       <div style={{ height: 8 }} />
-      {order.items.map((i) => <div key={i.id} className="ln"><span>{i.name} × {i.quantity}</span><span className="num">{n(i.quantity * i.unitPrice)}</span></div>)}
+      {order.items.map((i) => (
+        <div key={i.id} className="ln">
+          <span>{i.name} × {i.quantity}{i.discountKind && i.discountValue ? ` · ${offLabel({ kind: i.discountKind, value: i.discountValue })}` : ""}</span>
+          <span className="num">{i.discountAmount > 0 && <s>{n(i.quantity * i.unitPrice)}</s>}{n(i.quantity * i.unitPrice - i.discountAmount)}</span>
+        </div>
+      ))}
       {order.discount > 0 && <div className="ln"><span>Discount {order.discountPercent}%</span><span className="num">− {n(order.discount)}</span></div>}
       {order.deliveryCharge > 0 && <div className="ln"><span>Delivery fee</span><span className="num">{n(order.deliveryCharge)}</span></div>}
       <div className="ln tot"><span>TOTAL</span><span className="num">{n(order.total)}</span></div>

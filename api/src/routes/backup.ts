@@ -11,7 +11,7 @@ const tables = [
   ["products", sql`select id, store_id, name, price, cost, active, shopify_product_id, image_url, created_at from products order by created_at`],
   ["customers", sql`select id, store_id, name, phone, addresses, notes, created_at from customers order by created_at`],
   ["orders", sql`select * from orders order by created_at`],
-  ["orderItems", sql`select id, order_id, product_id, position, name, quantity, unit_price from order_items order by order_id, position`],
+  ["orderItems", sql`select id, order_id, product_id, position, name, quantity, unit_price, discount_kind, discount_value, discount_amount from order_items order by order_id, position`],
   ["invoices", sql`select id, store_id, order_id, status, number, finalised_at, created_at from invoices order by created_at`],
   ["invoiceEdits", sql`select id, invoice_id, changed, before, after, created_at from invoice_edits order by created_at`],
   ["stockMovements", sql`select id, store_id, product_id, delta, reason, order_id, note, created_at from stock_movements order by created_at`],
