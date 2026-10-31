@@ -95,7 +95,7 @@ Numbers and results are in [docs/TEST-REPORT.md](docs/TEST-REPORT.md); the plan 
 
 ## Deploying
 
-The API deploys from [render.yaml](render.yaml) (secrets such as the database address, the email key and the owner emails are entered in Render's dashboard, never in the repo); the web app on Vercel with `API_URL` pointing at the API; the database on Neon, with the migrations applied by `npm run db:migrate -w @zindex/api`. The free API sleeps when idle, so the app shows a "waking up" screen when the server is asleep, and a free pinger is planned to keep it awake during shop hours.
+The API deploys from [render.yaml](render.yaml) (secrets such as the database address, the email key and the owner emails are entered in Render's dashboard, never in the repo); the web app on Vercel with `API_URL` pointing at the API; the database on Neon, with the migrations applied by `npm run db:migrate -w @zindex/api`. The free API sleeps when idle, so the app shows a "waking up" screen when the server is asleep, and a small Cloudflare Worker ([pinger/](pinger)) keeps it awake from 10:50 to 22:00 Pakistan time.
 
 ## Licence
 
