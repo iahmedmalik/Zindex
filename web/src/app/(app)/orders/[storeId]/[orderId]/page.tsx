@@ -23,7 +23,7 @@ const next: Partial<Record<Stage, { to: Stage; label: string }>> = {
 const templates = [["order_confirmed", "Order confirmed"], ["invoice", "Invoice"], ["rider_assigned", "Rider assigned"], ["on_the_way", "On the way"], ["delivered", "Delivered"], ["payment_reminder", "Payment reminder"], ["thank_you", "Thank you"]] as const;
 
 type DeliveryState = { delivery: Delivery | null };
-type Shipment = { courier: string; trackingNo: string | null; trackingUrl: string | null; shippedOn: string | null };
+type Shipment = { courier: string; trackingNo: string | null; trackingUrl: string | null; shippedOn: string | null; hasPhoto: boolean };
 const wa = (phone: string | null) => (phone ? `https://wa.me/${phone.replace(/^0/, "92")}` : null);
 const orNull = (v: string) => (v.trim() ? v.trim() : null);
 
@@ -202,7 +202,22 @@ export default function OrderPage() {
                   <label className="field"><span>Courier</span><input className="input" list="couriers" value={parcel.courier} onChange={(e) => setParcel({ ...parcel, courier: e.target.value })} placeholder="TCS, Leopards…" /></label>
                   <label className="field"><span>Tracking number</span><input className="input num" value={parcel.trackingNo} onChange={(e) => setParcel({ ...parcel, trackingNo: e.target.value })} /></label>
                 </div>
-                <datalist id="couriers"><option value="TCS" /><option value="Leopards" /><option value="M&P" /><option value="Trax" /><option value="Call Courier" /><option value="BlueEx" /></datalist>
+                <datalist id="couriers"><option value="PostEx" /><option value="TCS" /><option value="Leopards" /><option value="M&P" /><option value="Trax" /><option value="Call Courier" /><option value="BlueEx" /></datalist>
+                <div className="photo-row">
+                  <span className="photo-ic" aria-hidden="true"><Icon name="camera" size={22} /></span>
+                  <span className="grow"><b>Parcel photo</b><br /><span className="note">{!ship ? "Save the courier first, then add a photo." : ship.hasPhoto ? "Added. The customer sees it on their card." : "Optional. Take a fresh photo or pick one."}</span></span>
+                  {ship && (
+                    <label className="btn small quiet" style={{ cursor: "pointer" }}>
+                      <input type="file" accept="image/*" className="sr" disabled={busy} onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        e.target.value = "";
+                        if (!file) return;
+                        await run(async () => { await uploadPhoto(`${base}/shipment/photo`, await shrinkImage(file)); return "Parcel photo saved"; }).catch(() => undefined);
+                      }} />{ship.hasPhoto ? "Replace" : "Add"}
+                    </label>
+                  )}
+                  {ship?.hasPhoto && <button className="linkbtn" disabled={busy} onClick={() => run(async () => { await api(`${base}/shipment/photo`, { method: "DELETE" }); return "Parcel photo removed"; }).catch(() => undefined)}>Remove</button>}
+                </div>
                 <label className="field"><span>Tracking link (optional)</span><input className="input" value={parcel.trackingUrl} onChange={(e) => setParcel({ ...parcel, trackingUrl: e.target.value })} placeholder="https://" /></label>
                 <div className="inline">
                   <DoneButton done="Courier saved" disabled={busy || !parcel.courier.trim()} onClick={() => run(async () => {

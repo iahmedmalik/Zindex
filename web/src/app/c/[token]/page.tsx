@@ -13,6 +13,7 @@ type Card = {
   store: { name: string; phone: string | null; email: string | null; address: string | null; hasLogo?: boolean; accent: string };
   order: { orderNo: number; status: string; customerName: string; address: string | null; payment: string; items: { name: string; quantity: number }[]; subtotal: number; discount: number; deliveryCharge: number; total: number; riderFee: number; codAmount: number; collectAtDoor: number; paid: number };
   delivery: { service: string | null; riderName: string | null; riderPhone: string | null; bikeNumber: string | null; riderPhotoUrl: string | null; hasPhoto: boolean; riderPhotoTakenAt: string | null; trackingUrl: string | null; riderScreenshotUrl: string | null } | null;
+  shipment: { courier: string; trackingNo: string | null; trackingUrl: string | null; hasPhoto: boolean; photoTakenAt: string | null } | null;
   expiresAt: string;
 };
 
@@ -48,17 +49,18 @@ export default async function CardPage({ params }: { params: Promise<{ token: st
     );
   }
 
-  const { store, order, delivery } = card;
+  const { store, order, delivery, shipment } = card;
   const at = Math.max(0, steps.indexOf(order.status));
   const first = order.customerName.split(" ")[0];
   // This page is drawn on a server that may run in UTC (Vercel does), so say Pakistan time on purpose.
   const until = new Date(card.expiresAt).toLocaleDateString("en-GB", { day: "numeric", month: "long", timeZone: "Asia/Karachi" });
   const wa = store.phone ? `https://wa.me/${store.phone.replace(/\D/g, "").replace(/^0/, "92")}` : null;
   const cancelled = order.status === "cancelled" || order.status === "returned";
-  const track = safeLink(delivery?.trackingUrl ?? null);
+  const track = safeLink(delivery?.trackingUrl ?? shipment?.trackingUrl ?? null);
   const hasRider = !!delivery && (delivery.riderName || delivery.riderPhone);
-  const photoSrc = delivery?.hasPhoto ? `/backend/v1/public/card/${encodeURIComponent(token)}/photo` : safeLink(delivery?.riderPhotoUrl ?? null);
-  const photoTime = delivery?.riderPhotoTakenAt ? new Date(delivery.riderPhotoTakenAt).toLocaleTimeString("en-GB", { hour: "numeric", minute: "2-digit", hour12: true, timeZone: "Asia/Karachi" }) : null;
+  const photoSrc = delivery?.hasPhoto ? `/backend/v1/public/card/${encodeURIComponent(token)}/photo` : shipment?.hasPhoto ? `/backend/v1/public/card/${encodeURIComponent(token)}/shipment-photo` : safeLink(delivery?.riderPhotoUrl ?? null);
+  const photoOf = delivery?.hasPhoto || !shipment?.hasPhoto ? delivery?.riderPhotoTakenAt : shipment.photoTakenAt;
+  const photoTime = photoOf ? new Date(photoOf).toLocaleTimeString("en-GB", { hour: "numeric", minute: "2-digit", hour12: true, timeZone: "Asia/Karachi" }) : null;
 
   return (
     <div className="dcard" style={{ ["--store-base" as string]: store.accent }}>
@@ -75,6 +77,7 @@ export default async function CardPage({ params }: { params: Promise<{ token: st
         <section className="arrive" style={{ ["--i" as string]: 1 }}>
           <h1 className="big">{cancelled ? closedHeadline[order.status] : headline[order.status]}</h1>
           {order.status === "out_for_delivery" && delivery?.riderName && <p className="note-on">{delivery.riderName} has your parcel.</p>}
+          {order.status === "out_for_delivery" && !delivery?.riderName && shipment && <p className="note-on">{shipment.courier} has your parcel.</p>}
         </section>
 
         {order.status === "out_for_delivery" && <div className="arrive" style={{ ["--i" as string]: 2 }}><RouteMap /></div>}
@@ -103,18 +106,31 @@ export default async function CardPage({ params }: { params: Promise<{ token: st
           </section>
         )}
 
+        {shipment && !hasRider && !cancelled && (
+          <section className="white arrive" style={{ ["--i" as string]: 3 }} aria-label="Your courier">
+            <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: 14, alignItems: "center" }}>
+              <span aria-hidden="true" className="avatar">{shipment.courier.slice(0, 1).toUpperCase()}</span>
+              <div>
+                <b className="rider-name">{shipment.courier}</b><br />
+                <span className="note">Courier</span>
+                {shipment.trackingNo && <span className="plate">{shipment.trackingNo}</span>}
+              </div>
+            </div>
+          </section>
+        )}
+
         {photoSrc && !cancelled && (
           <figure className="white photo arrive" style={{ ["--i" as string]: 4 }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={photoSrc} alt={`Photo of ${delivery?.riderName ?? "your rider"}`} />
-            <figcaption><i className="live" />Photo of your rider{photoTime ? ` · taken ${photoTime}` : ""}</figcaption>
+            <img src={photoSrc} alt={delivery?.hasPhoto || !shipment?.hasPhoto ? `Photo of ${delivery?.riderName ?? "your rider"}` : "Photo of your parcel"} />
+            <figcaption><i className="live" />{delivery?.hasPhoto || !shipment?.hasPhoto ? "Photo of your rider" : "Photo of your parcel"}{photoTime ? ` · taken ${photoTime}` : ""}</figcaption>
           </figure>
         )}
 
         {track && !cancelled && order.status !== "delivered" && (
           <div className="arrive" style={{ ["--i" as string]: 5, display: "grid", gap: 6 }}>
             <a className="btn white-btn" href={track} target="_blank" rel="noopener noreferrer"><Pin />Track delivery</a>
-            <p className="note-on" style={{ textAlign: "center" }}>Opens your rider&apos;s live trip</p>
+            <p className="note-on" style={{ textAlign: "center" }}>{delivery?.trackingUrl ? "Opens your rider's live trip" : "Opens your courier's tracking page"}</p>
           </div>
         )}
 

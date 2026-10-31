@@ -82,6 +82,16 @@ export function publicCardRouter(db: Db): Router {
     res.set({ "Content-Type": photo.contentType, "Cache-Control": "no-store", "X-Robots-Tag": "noindex, nofollow", "X-Content-Type-Options": "nosniff" }).send(photo.image);
   });
 
+  // The parcel's picture (courier orders), only while the card link is valid.
+  router.get("/:token/shipment-photo", async (req, res) => {
+    const token = String(req.params.token);
+    if (!/^[A-Za-z0-9_-]{20,64}$/.test(token)) throw new HttpError(404, "This link is not available.");
+    const found = await db.transaction(async (tx) => rows<{ image: Buffer; contentType: string }>(tx, sql`select image, content_type from get_shipment_photo(${hashOf(token)})`));
+    const photo = found[0];
+    if (!photo) throw new HttpError(404, "There is no photo for this link.");
+    res.set({ "Content-Type": photo.contentType, "Cache-Control": "no-store", "X-Robots-Tag": "noindex, nofollow", "X-Content-Type-Options": "nosniff" }).send(photo.image);
+  });
+
   // The store's logo and watermark, only while the card link is valid.
   router.get("/:token/store-image/:kind", async (req, res) => {
     const token = String(req.params.token);

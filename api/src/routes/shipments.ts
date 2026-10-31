@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { Router, type Request } from "express";
+import express, { Router, type Request } from "express";
 import { z } from "zod";
 import { asOwner, type Db, type Tx } from "../db/client";
 import { pgCode, rows } from "../db/query";
@@ -19,8 +19,8 @@ const putBody = z
   .strict();
 // A parcel is only who carries it and how to follow it. It has no status of its own: the order's progress is the
 // order's status (orders.ts), moved by the main button and nothing else.
-type Shipment = { id: string; orderId: string; courier: string; trackingNo: string | null; trackingUrl: string | null; shippedOn: string | null };
-const cols = sql`id, order_id, courier, tracking_no, tracking_url, to_char(shipped_on, 'YYYY-MM-DD') as shipped_on`;
+type Shipment = { id: string; orderId: string; courier: string; trackingNo: string | null; trackingUrl: string | null; shippedOn: string | null; hasPhoto: boolean };
+const cols = sql`id, order_id, courier, tracking_no, tracking_url, to_char(shipped_on, 'YYYY-MM-DD') as shipped_on, exists (select 1 from shipment_photos p where p.shipment_id = shipments.id) as has_photo`;
 
 async function load(tx: Tx, orderId: string) {
   const [shipment] = await rows<Shipment>(tx, sql`select ${cols} from shipments where order_id = ${orderId}`);
@@ -77,6 +77,33 @@ export function shipmentRouter(db: Db): Router {
       if (pgCode(err) === "23505") throw new HttpError(409, "Another parcel already has that tracking number.");
       throw err;
     }
+  });
+
+  // The parcel's photo: one small JPEG or WebP per shipment (the app shrinks it first), like the rider's photo. It needs
+  // a saved courier, lives in the database, goes with the parcel, and reaches the customer only through a valid card link.
+  const photoBody = express.raw({ type: ["image/jpeg", "image/webp"], limit: "600kb" });
+  router.put("/photo", photoBody, async (req, res) => {
+    const type = req.headers["content-type"]?.split(";")[0];
+    const bytes = req.body as Buffer | undefined;
+    if (!Buffer.isBuffer(bytes) || bytes.length === 0) throw new HttpError(400, "Send the photo as a JPEG or WebP image, up to 600 KB.");
+    const result = await inOrder(req, async (tx, orderId) => {
+      const { shipment } = await load(tx, orderId);
+      if (!shipment) throw new HttpError(409, "Add the courier first, then the photo.");
+      await tx.execute(
+        sql`insert into shipment_photos (shipment_id, image, content_type) values (${shipment.id}, ${bytes}, ${type})
+            on conflict (shipment_id) do update set image = excluded.image, content_type = excluded.content_type, created_at = now()`,
+      );
+      return { hasPhoto: true };
+    });
+    res.json(result);
+  });
+
+  router.delete("/photo", async (req, res) => {
+    const result = await inOrder(req, async (tx, orderId) => {
+      const gone = await rows<{ id: string }>(tx, sql`delete from shipment_photos where shipment_id = (select id from shipments where order_id = ${orderId}) returning shipment_id as id`);
+      return { removed: gone.length };
+    });
+    res.json(result);
   });
 
   return router;
