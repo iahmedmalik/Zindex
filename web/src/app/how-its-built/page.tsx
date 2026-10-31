@@ -4,9 +4,9 @@ import Link from "next/link";
 export const metadata: Metadata = { title: "How it's built", description: "The story, the stack and the tests behind Zindex." };
 
 // Real numbers only. Update these when the suites change (see docs/TEST-REPORT.md).
-const API_TESTS = 178;
-const BROWSER_TESTS = 100; // 50 tests, each in a desktop and a 375 px phone view
-const MIGRATIONS = 25;
+const API_TESTS = 184;
+const BROWSER_TESTS = 104; // 52 tests, each in a desktop and a 375 px phone view
+const MIGRATIONS = 26;
 const REPO = "https://github.com/iahmedmalik/Zindex";
 
 const stack: [string, string][] = [

@@ -159,6 +159,10 @@ paths:
     parameters: [{ $ref: "#/components/parameters/storeId" }, { $ref: "#/components/parameters/orderId" }]
     get: { tags: [Delivery], summary: The courier parcel (courier, tracking number and link, date; no status of its own: the order's status is the only one), responses: { "200": { description: OK } } }
     put: { tags: [Delivery], summary: Record or edit the parcel by hand (no courier integration), responses: { "200": { description: OK }, "409": { description: Duplicate tracking number or not a courier order } } }
+  /v1/stores/{storeId}/orders/{orderId}/shipment/photo:
+    parameters: [{ $ref: "#/components/parameters/storeId" }, { $ref: "#/components/parameters/orderId" }]
+    put: { tags: [Delivery], summary: "Add or replace the parcel photo (the request body is the JPEG or WebP image, up to 600 KB). It needs a saved courier.", responses: { "200": { description: "{ hasPhoto }" }, "400": { description: Not a JPEG or WebP, or too big }, "409": { description: No courier saved yet, or not a courier order } } }
+    delete: { tags: [Delivery], summary: Remove the parcel photo, responses: { "200": { description: "{ removed }" } } }
   /v1/stores/{storeId}/shipments:
     parameters: [{ $ref: "#/components/parameters/storeId" }]
     get: { tags: [Delivery], summary: "The store's parcels, newest first, each with its order's stage", responses: { "200": { description: OK } } }
@@ -174,6 +178,13 @@ paths:
       security: []
       parameters: [{ name: token, in: path, required: true, schema: { type: string } }]
       responses: { "200": { description: The card }, "404": { description: Wrong, expired or switched off }, "429": { description: Too many requests } }
+  /v1/public/card/{token}/shipment-photo:
+    get:
+      tags: [Delivery]
+      summary: The parcel photo of a courier order, only while the card link is valid. Never cached.
+      security: []
+      parameters: [{ name: token, in: path, required: true, schema: { type: string } }]
+      responses: { "200": { description: The image }, "404": { description: No photo, or the link is wrong, expired or switched off } }
   /v1/stores/{storeId}/orders/{orderId}/payment/confirm:
     parameters: [{ $ref: "#/components/parameters/storeId" }, { $ref: "#/components/parameters/orderId" }]
     post: { tags: [Money], summary: "I can see the advance payment: records what is left as one payment (never marked received by itself)", responses: { "200": { description: OK } } }
