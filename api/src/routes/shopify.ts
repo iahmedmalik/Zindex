@@ -5,15 +5,16 @@ import { asOwner, type Db } from "../db/client";
 import { rows } from "../db/query";
 import { HttpError } from "../http-error";
 import { fetchProducts, ShopifyError, type ShopifyApp } from "../shopify/products";
+import { fetchPublicProducts, resolveMyshopify, systemLookup, type Lookup } from "../shopify/resolve";
 import { validateBody } from "../validate";
 import { storeIdOf } from "./ids";
 
-const domainBody = z
-  .object({ domain: z.string().trim().toLowerCase().regex(/^[a-z0-9][a-z0-9-]*\.myshopify\.com$/, "use the shop's .myshopify.com address").nullable() })
-  .strict();
+// The owner may type the shop's web address (sheenperfumes.com), a link, or its .myshopify.com address; the shop's real
+// .myshopify.com address is what gets saved.
+const domainBody = z.object({ domain: z.string().trim().max(200).nullable() }).strict();
 
 // Mounted at /v1/stores/:storeId/shopify
-export function shopifyRouter(db: Db, apps: Record<string, ShopifyApp>, f: typeof fetch = fetch): Router {
+export function shopifyRouter(db: Db, apps: Record<string, ShopifyApp>, f: typeof fetch = fetch, look: Lookup = systemLookup): Router {
   const router = Router({ mergeParams: true });
 
   const storeOf = async (ownerId: string, storeId: string) => {
@@ -22,18 +23,28 @@ export function shopifyRouter(db: Db, apps: Record<string, ShopifyApp>, f: typeo
     return store;
   };
 
-  // Is this store connected? (keys exist on the server for its shop)
+  // Is this store connected? With app keys on the server its products are read through the Admin API; without, from the
+  // shop's public product list. Either way a saved shop address is enough.
   router.get("/", async (req, res) => {
     const store = await storeOf(req.user!.id, storeIdOf(req));
-    res.json({ domain: store.shopifyDomain, connected: !!(store.shopifyDomain && apps[store.shopifyDomain]), lastSync: store.shopifySyncedAt });
+    res.json({ domain: store.shopifyDomain, connected: !!store.shopifyDomain, mode: store.shopifyDomain ? (apps[store.shopifyDomain] ? "keys" : "public") : null, lastSync: store.shopifySyncedAt });
   });
 
   router.put("/", validateBody(domainBody), async (req, res) => {
-    const { domain } = req.body as z.infer<typeof domainBody>;
+    const { domain: typed } = req.body as z.infer<typeof domainBody>;
     const storeId = storeIdOf(req);
     await storeOf(req.user!.id, storeId);
+    let domain: string | null = null;
+    if (typed) {
+      try {
+        domain = await resolveMyshopify(typed, f, look);
+      } catch (err) {
+        if (err instanceof ShopifyError) throw new HttpError(400, err.message);
+        throw err;
+      }
+    }
     await asOwner(db, req.user!.id, (tx) => tx.execute(sql`update stores set shopify_domain = ${domain}, updated_at = now() where id = ${storeId}`));
-    res.json({ domain, connected: !!(domain && apps[domain]) });
+    res.json({ domain, connected: !!domain, mode: domain ? (apps[domain] ? "keys" : "public") : null });
   });
 
   // Pulls names, prices and images. Products already linked are updated, a product with the same
@@ -43,11 +54,10 @@ export function shopifyRouter(db: Db, apps: Record<string, ShopifyApp>, f: typeo
     const store = await storeOf(req.user!.id, storeId);
     if (!store.shopifyDomain) throw new HttpError(409, "Add the store's Shopify address first.");
     const app = apps[store.shopifyDomain];
-    if (!app) throw new HttpError(409, "Shopify is not connected for this shop yet: its app keys are not on the server.");
 
     let products;
     try {
-      products = await fetchProducts(store.shopifyDomain, app, f);
+      products = app ? await fetchProducts(store.shopifyDomain, app, f) : await fetchPublicProducts(store.shopifyDomain, f, look);
     } catch (err) {
       if (err instanceof ShopifyError) throw new HttpError(502, err.message);
       throw new HttpError(502, "Could not reach Shopify. Try again in a minute; everything else still works.");

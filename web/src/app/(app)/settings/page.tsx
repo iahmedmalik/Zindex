@@ -9,7 +9,7 @@ import { useSession } from "@/lib/session";
 import type { Store } from "@/lib/types";
 
 type Template = { key: string; body: string; edited: boolean };
-type ShopifyState = { domain: string | null; connected: boolean; lastSync: string | null };
+type ShopifyState = { domain: string | null; connected: boolean; mode?: "keys" | "public" | null; lastSync: string | null };
 type ImportResult = { imported: { ref: string; orderNo: number }[]; alreadyImported: string[]; skipped: { ref: string; reason: string }[]; warnings: { ref: string; reason: string }[] };
 // The first colour is what a new store starts with: the app's own maroon, the same as the database default.
 const storeColours = ["#5d1b23", "#8a3b12", "#1f3a5f", "#24523b", "#6b3a8a", "#2b2b2b"];
@@ -172,16 +172,17 @@ export default function SettingsPage() {
             </div>
             <div className="well">
               <h3>Products from Shopify</h3>
-              <p className="note">Brings in names, prices and pictures. Your stock counts stay as they are.</p>
+              <p className="note">Brings in names, prices and pictures. Your stock counts stay as they are. Type your shop's web address, like sheenperfumes.com.</p>
               <div className="inline" style={{ flexWrap: "nowrap" }}>
-                <input className="input" style={{ flex: 1 }} placeholder="your-shop.myshopify.com" aria-label="Shopify address" value={domain} onChange={(e) => setDomain(e.target.value)} />
+                <input className="input" style={{ flex: 1 }} placeholder="sheenperfumes.com" aria-label="Shopify address" value={domain} onChange={(e) => setDomain(e.target.value)} />
                 <DoneButton className="btn quiet" done="Saved" onClick={async () => {
-                  try { const r = await api<{ domain: string | null; connected: boolean }>(`/stores/${storeId}/shopify`, { method: "PUT", body: { domain: domain.trim() || null } }); setShop((s) => ({ lastSync: s?.lastSync ?? null, ...r })); } catch (err) { toast(messageOf(err), "bad"); throw err; }
+                  try { const r = await api<{ domain: string | null; connected: boolean; mode: "keys" | "public" | null }>(`/stores/${storeId}/shopify`, { method: "PUT", body: { domain: domain.trim() || null } }); setShop((s) => ({ lastSync: s?.lastSync ?? null, ...r })); setDomain(r.domain ?? ""); } catch (err) { toast(messageOf(err), "bad"); throw err; }
                 }}>Save</DoneButton>
               </div>
               {shop?.domain && (
                 <div className="inline">
-                  <span className={`badge ${shop.connected ? "ok" : "warn"}`}>{shop.connected ? "Connected" : "Keys not on the server yet"}</span>
+                  <span className={`badge ${shop.connected ? "ok" : "warn"}`}>{shop.connected ? "Connected" : "Not connected"}</span>
+                  <span className="note">Found your shop at {shop.domain}.{shop.mode === "public" ? " Reads your public product list: draft and archived products are not included." : ""}</span>
                   {shop.lastSync && <span className="note">Last sync {new Date(shop.lastSync).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</span>}
                   <button className="btn small" disabled={!shop.connected || syncing} onClick={async () => {
                     setSyncing(true);

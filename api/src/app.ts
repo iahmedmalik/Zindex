@@ -16,6 +16,8 @@ export type AppContext = {
   auth: Auth;
   /** Stand-in for outside calls (Shopify) in tests. */
   fetch?: typeof fetch;
+  /** Stand-in for the DNS lookup used to check a shop address is public (tests). */
+  lookup?: (host: string) => Promise<string[]>;
 };
 
 export function createApp(ctx?: AppContext): Express {

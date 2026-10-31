@@ -179,7 +179,7 @@ Name,Email,Financial Status,Shipping,Total,Discount Amount,Lineitem quantity,Lin
 PUT {{api}}/v1/stores/{{store}}/shopify
 Content-Type: application/json
 
-{ "domain": "your-shop.myshopify.com" }
+{ "domain": "sheenperfumes.com" }
 
 ###
 POST {{api}}/v1/stores/{{store}}/shopify/sync

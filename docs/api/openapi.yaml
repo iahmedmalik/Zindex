@@ -238,11 +238,11 @@ paths:
       responses: { "200": { description: "{ imported, alreadyImported, skipped, warnings }" }, "400": { description: Not a Shopify export } }
   /v1/stores/{storeId}/shopify:
     parameters: [{ $ref: "#/components/parameters/storeId" }]
-    get: { tags: [Shopify], summary: "Is this store connected to Shopify?", responses: { "200": { description: OK } } }
-    put: { tags: [Shopify], summary: Name the store's .myshopify.com address, responses: { "200": { description: OK } } }
+    get: { tags: [Shopify], summary: "Is this store connected to Shopify? ({ domain, connected, mode, lastSync }; mode is keys when the server has the shop's app keys, public otherwise)", responses: { "200": { description: OK } } }
+    put: { tags: [Shopify], summary: "Name the shop: its web address (sheenperfumes.com), a link, or its .myshopify.com address. The shop's real .myshopify.com address is saved. Only public addresses are fetched.", responses: { "200": { description: "{ domain, connected, mode }" }, "400": { description: Not a shop address, not a Shopify shop, or not a public address } } }
   /v1/stores/{storeId}/shopify/sync:
     parameters: [{ $ref: "#/components/parameters/storeId" }]
-    post: { tags: [Shopify], summary: Pull names, prices and images (read only; never stock). If Shopify fails nothing changes., responses: { "200": { description: "{ added, updated, linked, skipped, total }" }, "409": { description: Not set up }, "502": { description: Shopify did not answer } } }
+    post: { tags: [Shopify], summary: Pull names, prices and images (read only; never stock) through the Admin API if the server has keys for the shop, otherwise from the shop's public product list (published products only). If Shopify fails nothing changes., responses: { "200": { description: "{ added, updated, linked, skipped, total }" }, "409": { description: Not set up }, "502": { description: Shopify did not answer } } }
 components:
   securitySchemes:
     session: { type: apiKey, in: cookie, name: better-auth.session_token, description: Set by sign-in }
