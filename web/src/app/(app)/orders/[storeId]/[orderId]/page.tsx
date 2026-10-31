@@ -255,7 +255,7 @@ export default function OrderPage() {
               {cardUrl && (
                 <button className="linkbtn" style={{ justifySelf: "start" }} disabled={busy} onClick={async () => { if (!(await confirmCard({ title: "Make a new link?", body: <p>The old link will stop working.</p>, confirm: "Make a new link" })).ok) return; void run(async () => { await api(`${base}/card`, { method: "POST", body: {} }); return "New delivery card link made · the old one is off"; }).catch(() => undefined); }}>Make a new link</button>
               )}
-              <div className="chips">
+              <div className="chips" role="group" aria-label="WhatsApp messages" tabIndex={order.customerPhone ? undefined : 0}>
                 {templates.filter(([key]) => (pickup ? pickupMessages.includes(key) : key !== "ready_for_pickup")).map(([key, label]) => (
                   <button key={key} className="chip" disabled={!order.customerPhone} onClick={async () => {
                     try {

@@ -7,11 +7,11 @@
 | Suite | Result |
 |---|---|
 | API tests (Vitest, real local PostgreSQL) | **207 passed**, 0 failed, 31 test files |
-| Browser tests (Playwright, against the production build) | **126 passed**, 0 failed: 63 tests, each run at desktop 1280 px and a 375 px phone view (includes the saved-invoice-picture comparison, the tour, the demo, the customer card following the order, and the cash views) |
+| Browser tests (Playwright, against the production build) | **142 passed**, 0 failed: 71 tests, each run at desktop 1280 px and a 375 px phone view (includes the saved-invoice-picture comparison, the tour, the demo, the customer card following the order, and the cash views) |
 | Typecheck | web and API clean |
 | Production build (Next.js) | passes |
 | Dependency audit (`npm audit`) | 0 vulnerabilities |
-| Accessibility (axe-core, WCAG 2 A/AA including colour contrast), page overflow and touch-target size (run 28 Oct, not repeated since the 29 Oct changes) | 11 screens x laptop and 375 px x light and dark = 44 page views: **0 axe violations, 0 pages wider than the screen**. Two touch-size notes, both by design: a visually hidden radio behind a custom control, and the options inside a 46 px segmented control |
+| Accessibility (axe-core, WCAG 2 A/AA including colour contrast) and page overflow, now a permanent test (`a11y.spec.ts`, run 1 Nov). Touch-target size was last checked 28 Oct and is not part of it | 24 screens (every shop screen, an order of each delivery kind, its edit form, the invoice, the four customer cards, the public pages) x laptop and 375 px x light and dark = 96 page views: **0 axe violations, 0 pages wider than the screen** after one fix (see defects) |
 | CI (GitHub Actions: typecheck, tests, build) | green on every API commit |
 
 ## Defects found by testing, and fixed
@@ -27,6 +27,7 @@
 | Browser test | Closed (folded) panels still had buttons that could be tabbed to and were read by screen readers | Closed panels are hidden from the keyboard and screen readers, and still fold away smoothly |
 | Browser test on a phone (found while testing the redesign) | The floating "New order" button sat on top of the order page's action bar at the bottom of the page and could cover "Confirm order" | Pages with their own action bar hide the floating button |
 | Accessibility check (axe) | Today had no main heading for screen readers; the logo link, "See all" and the store-colour swatches were smaller than 44 px | Hidden Today heading added; those targets are now 44 px |
+| Accessibility check (axe, 1 Nov) | On an order with no phone number all the WhatsApp message buttons are disabled, so the sideways-scrolling row could not be reached with the keyboard | The row is focusable when its buttons are not |
 | Looking at the new invoice on screen | The invoice body was blank: its class names (`.sheet`, `.hero`, `.paper`...) collided with older classes in the same stylesheet (a bottom sheet that is hidden off screen, 16 px of extra padding) | The invoice classes now carry their own prefix (`iv-`, `ivp`) |
 | API test for owner-only sign-up | Refusing a stranger inside the database hook was hidden by the sign-in library behind a fake success, so the person saw no message | The sign-up request itself is checked first and answers 403 with a plain message; the database hook stays as a second lock |
 | Looking at the guided tour | The tour skipped the floating "New order" button (a fixed element has no layout parent, so the "is it on the page" check said no) | The check uses the element's drawn size instead |
