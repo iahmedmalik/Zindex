@@ -9,7 +9,7 @@ import { useSession } from "@/lib/session";
 
 type Sales = {
   storeId: string; name: string; orders: number; returned: number; gross: number; discounts: number; deliveryFees: number; netSales: number;
-  returnedValue: number; codCollected: number; onlineReceived: number; riderFeesPassedOn: number; costOfGoods: number; linesWithoutCost: number;
+  returnedValue: number; codCollected: number; onlineReceived: number; riderFeesPassedOn: number; deliveryPaidByStore: number; costOfGoods: number; linesWithoutCost: number;
   salesWithCost: number; salesWithoutCost: number; profit: number; marginPercent: number | null;
 };
 type Received = { total: number; payments: number; byMethod: { name: string; amount: number }[]; byStore: { name: string; amount: number }[] };
@@ -69,10 +69,11 @@ export default function ReportsPage() {
               <ul className="ledger">
                 <li><span>Goods sold</span><span className="lead" /><span className="num">{pkr(t.gross)}</span></li>
                 <li className="aside"><span>Discounts</span><span className="lead" /><span className="num">− {t.discounts.toLocaleString("en-US")}</span></li>
-                <li><span>Courier delivery fees</span><span className="lead" /><span className="num">{t.deliveryFees.toLocaleString("en-US")}</span></li>
+                <li><span>Courier delivery fees (customers paid)</span><span className="lead" /><span className="num">{t.deliveryFees.toLocaleString("en-US")}</span></li>
                 {t.returnedValue > 0 && <li className="aside"><span>Returned</span><span className="lead" /><span className="num">− {t.returnedValue.toLocaleString("en-US")}</span></li>}
                 <li className="total"><span>Net sales</span><span className="lead" /><span className="num">{pkr(t.netSales)}</span></li>
                 <li className="aside"><span>Rider fees (went to riders, not sales)</span><span className="lead" /><span className="num">{t.riderFeesPassedOn.toLocaleString("en-US")}</span></li>
+                {t.deliveryPaidByStore > 0 && <li><span>Delivery paid by the store</span><span className="lead" /><span className="num">− {t.deliveryPaidByStore.toLocaleString("en-US")}</span></li>}
               </ul>
             </section>
             <section className="section">
@@ -100,6 +101,7 @@ export default function ReportsPage() {
               <ul className="ledger">
                 <li><span>Sold for (items with a cost, after discount)</span><span className="lead" /><span className="num">{t.salesWithCost.toLocaleString("en-US")}</span></li>
                 <li className="aside"><span>What those items cost</span><span className="lead" /><span className="num">− {t.costOfGoods.toLocaleString("en-US")}</span></li>
+                {t.deliveryPaidByStore > 0 && <li className="aside"><span>Delivery you paid</span><span className="lead" /><span className="num">− {t.deliveryPaidByStore.toLocaleString("en-US")}</span></li>}
                 <li className="total"><span>Profit</span><span className="lead" /><span className="num">{pkr(t.profit)}</span></li>
               </ul>
               {t.linesWithoutCost > 0 ? (
@@ -109,7 +111,7 @@ export default function ReportsPage() {
                   <Link className="btn quiet" href="/reports/costs">Fill in the costs</Link>
                 </div>
               ) : <p className="note">Every sold item has a cost, so this profit is complete.</p>}
-              <p className="note">Profit is goods margin: what the items sold for minus what they cost. Delivery fees, rider fees and what you pay a courier are not in it.</p>
+              <p className="note">Profit is goods margin: what the items sold for minus what they cost. Delivery the customer paid (courier fees, rider fees) is not in it; delivery you paid yourself is taken off.</p>
             </section>
             {report.stores.length > 1 && (
               <section className="section">

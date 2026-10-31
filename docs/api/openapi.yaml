@@ -270,7 +270,8 @@ components:
         discountPercent: { type: integer, minimum: 0, maximum: 100 }
         deliveryKind: { enum: [local, courier, pickup] }
         deliveryCharge: { type: integer, description: The store's flat courier fee (part of the total) }
-        riderFee: { type: integer, description: Paid by the recipient straight to the rider; never part of the total }
+        riderFee: { type: integer, description: Paid by the recipient straight to the rider; never part of the total (unless the store pays it, see deliveryPaidBy) }
+        deliveryPaidBy: { enum: [customer, store], description: "Who pays for delivery on a rider or courier order. customer (the default) is the rule above. store: the total is goods only, nothing for delivery is collected or shown to the customer, and the fee or charge typed is the store's own cost, taken off profit in reports. Always customer on a pickup." }
         payment: { enum: [paid, cod, unpaid] }
         paymentMethod: { type: [string, "null"] }
         notes: { type: [string, "null"] }

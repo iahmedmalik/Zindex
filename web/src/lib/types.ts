@@ -24,6 +24,7 @@ export type Order = {
   discountPercent: number;
   deliveryCharge: number;
   riderFee: number;
+  deliveryPaidBy: "customer" | "store";
   subtotal: number;
   discount: number;
   total: number;

@@ -43,6 +43,7 @@ const fields = {
   discountPercent: z.number().int().min(0).max(100),
   deliveryCharge: money,
   riderFee: money,
+  deliveryPaidBy: z.enum(["customer", "store"]),
   deliveryKind: z.enum(["local", "courier", "pickup"]),
   payment: z.enum(["paid", "cod", "unpaid"]),
   paymentMethod: z.string().trim().min(1).max(40).nullable(),
@@ -59,6 +60,7 @@ const createBody = z
     discountPercent: fields.discountPercent.optional(),
     deliveryCharge: fields.deliveryCharge.optional(),
     riderFee: fields.riderFee.optional(),
+    deliveryPaidBy: fields.deliveryPaidBy.optional(),
     deliveryKind: fields.deliveryKind.optional(),
     payment: fields.payment.optional(),
     paymentMethod: fields.paymentMethod.optional(),
@@ -88,6 +90,7 @@ export type Order = {
   discountPercent: number;
   deliveryCharge: number;
   riderFee: number;
+  deliveryPaidBy: "customer" | "store";
   subtotal: number;
   discount: number;
   total: number;
@@ -110,7 +113,7 @@ export type Order = {
 
 const orderSelect = sql`
   o.id, o.store_id, o.order_no, o.customer_id, o.customer_name, o.customer_phone, o.address, o.source, o.status,
-  o.delivery_kind, o.payment, o.payment_method, o.discount_percent, o.delivery_charge, o.rider_fee, o.subtotal,
+  o.delivery_kind, o.payment, o.payment_method, o.discount_percent, o.delivery_charge, o.rider_fee, o.delivery_paid_by, o.subtotal,
   o.discount, o.total, o.cod_amount, o.collect_at_door, o.amount_due, o.notes, o.stock_applied, o.payment_confirmed_at, o.delivered_at, o.external_ref, o.created_at, o.updated_at,
   case when o.payment = 'cod' then o.cod_amount else o.total end as expected,
   coalesce((select sum(p.amount) from order_payments p where p.order_id = o.id), 0)::int as paid,
@@ -158,7 +161,10 @@ async function resolveItems(tx: Tx, storeId: string, items: ItemInput[], previou
   return out;
 }
 
-function totalsFor(items: Resolved[], v: { discountPercent: number; deliveryCharge: number; riderFee: number; payment: "paid" | "cod" | "unpaid" }) {
+// A pickup has no delivery to pay for, so it is always "customer" (the default, which changes nothing).
+const paidBy = (kind: string, choice: "customer" | "store" | undefined): "customer" | "store" => (kind === "pickup" ? "customer" : (choice ?? "customer"));
+
+function totalsFor(items: Resolved[], v: { discountPercent: number; deliveryCharge: number; riderFee: number; payment: "paid" | "cod" | "unpaid"; deliveryPaidBy: "customer" | "store" }) {
   try {
     return calculateTotals({
       lines: items.map((i) => ({ quantity: i.quantity, unitPrice: i.unitPrice, discount: i.discount })),
@@ -166,6 +172,7 @@ function totalsFor(items: Resolved[], v: { discountPercent: number; deliveryChar
       deliveryCharge: v.deliveryCharge,
       riderFee: v.riderFee,
       payment: v.payment,
+      deliveryPaidBy: v.deliveryPaidBy,
     });
   } catch (err) {
     throw new HttpError(400, err instanceof Error ? err.message : "The amounts are not valid.");
@@ -239,7 +246,7 @@ export type NewOrder = Omit<z.infer<typeof createBody>, "source" | "idempotencyK
 /** Saves one new order: resolves the items, works out the totals, saves the customer and takes the next order number. */
 export async function insertOrder(tx: Tx, storeId: string, b: NewOrder, key: string | null = null): Promise<string> {
   const items = await resolveItems(tx, storeId, b.items);
-  const v = { discountPercent: b.discountPercent ?? 0, deliveryCharge: b.deliveryCharge ?? 0, riderFee: b.riderFee ?? 0, payment: b.payment ?? "cod" };
+  const v = { discountPercent: b.discountPercent ?? 0, deliveryCharge: b.deliveryCharge ?? 0, riderFee: b.riderFee ?? 0, payment: b.payment ?? "cod", deliveryPaidBy: paidBy(b.deliveryKind ?? "local", b.deliveryPaidBy) };
   const t = totalsFor(items, v);
   const phone = b.customerPhone ?? null;
   const customerId = await saveCustomer(tx, storeId, b.customerName, phone, b.address ?? null);
@@ -247,10 +254,10 @@ export async function insertOrder(tx: Tx, storeId: string, b: NewOrder, key: str
   const id = (await rows<{ id: string }>(
     tx,
     sql`insert into orders (store_id, order_no, customer_id, customer_name, customer_phone, address, source, delivery_kind, payment,
-          payment_method, discount_percent, delivery_charge, rider_fee, subtotal, discount, total, cod_amount, collect_at_door,
+          payment_method, discount_percent, delivery_charge, rider_fee, delivery_paid_by, subtotal, discount, total, cod_amount, collect_at_door,
           amount_due, notes, idempotency_key, external_ref)
         values (${storeId}, ${orderNo}, ${customerId}, ${b.customerName}, ${phone}, ${b.address ?? null}, ${b.source ?? "whatsapp"},
-          ${b.deliveryKind ?? "local"}, ${v.payment}, ${b.paymentMethod ?? null}, ${v.discountPercent}, ${v.deliveryCharge}, ${v.riderFee},
+          ${b.deliveryKind ?? "local"}, ${v.payment}, ${b.paymentMethod ?? null}, ${v.discountPercent}, ${v.deliveryCharge}, ${v.riderFee}, ${v.deliveryPaidBy},
           ${t.subtotal}, ${t.discount}, ${t.total}, ${t.codAmount}, ${t.collectAtDoor}, ${t.amountDue}, ${b.notes ?? null}, ${key}, ${b.externalRef ?? null})
         returning id`,
   ))[0]!.id;
@@ -389,6 +396,7 @@ export function ordersRouter(db: Db, config: Config): Router {
         discountPercent: b.discountPercent ?? current.discountPercent,
         deliveryCharge: b.deliveryCharge ?? current.deliveryCharge,
         riderFee: b.riderFee ?? current.riderFee,
+        deliveryPaidBy: paidBy(b.deliveryKind ?? current.deliveryKind, b.deliveryPaidBy ?? current.deliveryPaidBy),
         payment: (b.payment ?? current.payment) as "paid" | "cod" | "unpaid",
       };
       const t = totalsFor(items, v);
@@ -401,7 +409,7 @@ export function ordersRouter(db: Db, config: Config): Router {
         sql`update orders set customer_id = ${customerId}, customer_name = ${name}, customer_phone = ${phone}, address = ${address},
               delivery_kind = ${b.deliveryKind ?? current.deliveryKind}, payment = ${v.payment},
               payment_method = ${"paymentMethod" in b ? (b.paymentMethod ?? null) : current.paymentMethod},
-              discount_percent = ${v.discountPercent}, delivery_charge = ${v.deliveryCharge}, rider_fee = ${v.riderFee},
+              discount_percent = ${v.discountPercent}, delivery_charge = ${v.deliveryCharge}, rider_fee = ${v.riderFee}, delivery_paid_by = ${v.deliveryPaidBy},
               subtotal = ${t.subtotal}, discount = ${t.discount}, total = ${t.total}, cod_amount = ${t.codAmount},
               collect_at_door = ${t.collectAtDoor}, amount_due = ${t.amountDue},
               notes = ${"notes" in b ? (b.notes ?? null) : current.notes}, updated_at = now()

@@ -9,7 +9,10 @@
 //  - deliveryCharge is the store's flat courier fee (part of the store's money); riderFee is the
 //    inDrive/Yango fee typed in per parcel, paid by the recipient straight to the rider, and is
 //    NOT part of the store's total
-//  - total (the store's invoice total) = subtotal - discount + deliveryCharge
+//  - who pays delivery (31 Oct, from the owner's brother): "customer" is the rules above and below. "store" means the
+//    store bears the delivery: the customer's total is goods only (no deliveryCharge in it), no rider fee is collected at
+//    the door, and the typed fee or charge is the store's own delivery cost (deliveryCost), which reports take off profit
+//  - total (the store's invoice total) = subtotal - discount + deliveryCharge (only when the customer pays delivery)
 //  - payment: "paid" owes nothing, "cod" means the rider collects the total for the store,
 //    "unpaid" owes the total later (ASSUMED: the rider collects only his own fee)
 //  - collectAtDoor = what the recipient hands the rider = codAmount + riderFee
@@ -30,7 +33,10 @@ export type Totals = {
   codAmount: number;
   collectAtDoor: number;
   amountDue: number;
+  /** What the store itself pays for delivery on this order (0 when the customer pays it). */
+  deliveryCost: number;
 };
+export type DeliveryPaidBy = "customer" | "store";
 
 const whole = (n: number) => Number.isInteger(n) && n >= 0;
 
@@ -48,7 +54,8 @@ export function lineDiscount(line: Line): number {
   return d.value;
 }
 
-export function calculateTotals(input: { lines: Line[]; discount: Discount; deliveryCharge: number; riderFee: number; payment: Payment }): Totals {
+export function calculateTotals(input: { lines: Line[]; discount: Discount; deliveryCharge: number; riderFee: number; payment: Payment; deliveryPaidBy?: DeliveryPaidBy }): Totals {
+  const storePays = input.deliveryPaidBy === "store";
   if (!whole(input.deliveryCharge)) throw new Error("Delivery charge must be a whole, non-negative number of rupees.");
   if (!whole(input.riderFee)) throw new Error("Rider fee must be a whole, non-negative number of rupees.");
   let subtotal = 0;
@@ -66,7 +73,7 @@ export function calculateTotals(input: { lines: Line[]; discount: Discount; deli
     if (d.percent < 0 || d.percent > 100) throw new Error("Percent must be between 0 and 100.");
     discount = Math.round((subtotal * d.percent) / 100);
   }
-  const total = subtotal - discount + input.deliveryCharge;
+  const total = subtotal - discount + (storePays ? 0 : input.deliveryCharge);
   const codAmount = input.payment === "cod" ? total : 0;
   return {
     lineDiscounts,
@@ -76,7 +83,8 @@ export function calculateTotals(input: { lines: Line[]; discount: Discount; deli
     total,
     riderFee: input.riderFee,
     codAmount,
-    collectAtDoor: codAmount + input.riderFee,
+    collectAtDoor: codAmount + (storePays ? 0 : input.riderFee),
     amountDue: input.payment === "paid" ? 0 : total,
+    deliveryCost: storePays ? input.deliveryCharge + input.riderFee : 0,
   };
 }

@@ -6,7 +6,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { DiscountCard } from "@/components/discount-card";
 import { Count, Icon, Seg, useToast } from "@/components/ui";
 import { api, messageOf } from "@/lib/api";
-import { lineOff, offLabel, previewTotals } from "@/lib/format";
+import { lineOff, offLabel, pkr, previewTotals } from "@/lib/format";
 import { useSession } from "@/lib/session";
 import type { Customer, DeliveryKind, ItemDiscount, Order, Payment, Product } from "@/lib/types";
 
@@ -38,6 +38,7 @@ export function OrderForm({ edit }: { edit?: Order }) {
   const [discountOpen, setDiscountOpen] = useState(false);
   const [discount, setDiscount] = useState(edit?.discountPercent ?? 0);
   const [kind, setKind] = useState<DeliveryKind>(edit?.deliveryKind ?? "local");
+  const [paidBy, setPaidBy] = useState<"customer" | "store">(edit?.deliveryPaidBy ?? "customer");
   const [riderFee, setRiderFee] = useState(edit?.riderFee ? String(edit.riderFee) : "");
   const [flatFee, setFlatFee] = useState(edit?.deliveryCharge ? String(edit.deliveryCharge) : "");
   const [payment, setPayment] = useState<Payment>(edit?.payment ?? "cod");
@@ -66,8 +67,10 @@ export function OrderForm({ edit }: { edit?: Order }) {
   const shown = useMemo(() => products.filter((p) => p.name.toLowerCase().includes(find.trim().toLowerCase())).slice(0, 16), [products, find]);
   const fee = kind === "local" ? digits(riderFee) : 0;
   const flat = kind === "courier" ? digits(flatFee) : 0;
-  const t = previewTotals(lines, discount, flat, fee, payment);
+  const storePays = kind !== "pickup" && paidBy === "store";
+  const t = previewTotals(lines, discount, flat, fee, payment, storePays);
   const door = t.collectAtDoor;
+  const doorFee = storePays ? 0 : fee; // the rider fee the customer hands over; when we pay the rider it is not at the door
   const qtyOf = (id: string) => lines.find((l) => l.productId === id)?.quantity ?? 0;
   const who = name.trim().length > 1;
 
@@ -93,6 +96,7 @@ export function OrderForm({ edit }: { edit?: Order }) {
         discountPercent: discount,
         deliveryKind: kind,
         riderFee: fee,
+        deliveryPaidBy: kind === "pickup" ? "customer" : paidBy,
         deliveryCharge: flat,
         payment,
         paymentMethod: payment === "paid" ? method : payment === "cod" ? "Cash" : null,
@@ -190,8 +194,12 @@ export function OrderForm({ edit }: { edit?: Order }) {
       <section className="section">
         <h2>Delivery and payment</h2>
         <Seg label="Delivery" value={kind} onChange={setKind} options={[["local", "Rider"], ["courier", "Courier"], ["pickup", "Pickup"]] as const} />
-        <div className={`expand${kind === "local" ? " open" : ""}`}><div><label className="field"><span>Rider fee · the customer pays the rider, not the store</span><input className="input num" inputMode="numeric" placeholder="0" value={riderFee} onChange={(e) => setRiderFee(e.target.value.replace(/\D/g, ""))} /></label></div></div>
-        <div className={`expand${kind === "courier" ? " open" : ""}`}><div><label className="field"><span>Delivery fee · part of the store&apos;s total</span><input className="input num" inputMode="numeric" placeholder="0" value={flatFee} onChange={(e) => setFlatFee(e.target.value.replace(/\D/g, ""))} /></label></div></div>
+        <div className={`expand${kind !== "pickup" ? " open" : ""}`}><div>
+          <div className="field"><span>Who pays for delivery</span><Seg label="Who pays for delivery" value={paidBy} onChange={setPaidBy} options={[["customer", "Customer"], ["store", "We pay"]] as const} /></div>
+        </div></div>
+        <div className={`expand${kind === "local" ? " open" : ""}`}><div><label className="field"><span>{paidBy === "store" ? "Rider fee · we pay the rider, the customer is not charged" : "Rider fee · the customer pays the rider, not the store"}</span><input className="input num" inputMode="numeric" placeholder="0" value={riderFee} onChange={(e) => setRiderFee(e.target.value.replace(/\D/g, ""))} /></label></div></div>
+        <div className={`expand${kind === "courier" ? " open" : ""}`}><div><label className="field"><span>{paidBy === "store" ? "Delivery cost · we pay the courier, not added to the total" : "Delivery fee · part of the store's total"}</span><input className="input num" inputMode="numeric" placeholder="0" value={flatFee} onChange={(e) => setFlatFee(e.target.value.replace(/\D/g, ""))} /></label></div></div>
+        <div className={`expand${storePays && fee + flat > 0 ? " open" : ""}`}><div><p className="note">Customer pays {pkr(t.total)} for the goods. Delivery costs you {pkr(fee + flat)}.</p></div></div>
         <div className="field"><span>Discount</span>
           <div className="inline" role="group" aria-label="Discount">
             {[0, 5, 10, 15].map((d) => <button type="button" key={d} className="chip" aria-pressed={discount === d} onClick={() => setDiscount(d)}>{d ? `${d}%` : "None"}</button>)}
@@ -213,7 +221,7 @@ export function OrderForm({ edit }: { edit?: Order }) {
         <div className="grow">
           <div className="num" style={{ fontSize: "var(--t-xl)", fontWeight: 700, lineHeight: 1.1 }}>PKR <Count value={t.total} money /></div>
           <div className={`expand${door > 0 ? " open" : ""}`}><div><span className="note num" style={{ fontSize: "var(--t-xs)", fontWeight: 600 }}>
-            {t.codAmount > 0 && fee > 0 ? `At the door ${door.toLocaleString("en-US")} · store ${t.codAmount.toLocaleString("en-US")} + rider ${fee.toLocaleString("en-US")}` : t.codAmount > 0 ? `Collect ${t.codAmount.toLocaleString("en-US")} for the store` : `Rider collects only his fee, ${fee.toLocaleString("en-US")}`}
+            {t.codAmount > 0 && doorFee > 0 ? `At the door ${door.toLocaleString("en-US")} · store ${t.codAmount.toLocaleString("en-US")} + rider ${doorFee.toLocaleString("en-US")}` : t.codAmount > 0 ? `Collect ${t.codAmount.toLocaleString("en-US")} for the store` : `Rider collects only his fee, ${doorFee.toLocaleString("en-US")}`}
           </span></div></div>
         </div>
         <button className="btn" disabled={busy || lines.length === 0 || !who}>{busy ? "Saving…" : edit ? "Save changes" : "Create order"}</button>

@@ -25,10 +25,18 @@ export const offLabel = (d: ItemDiscount) => (d.kind === "percent" ? `${d.value}
 
 // A display-only preview of the totals while the order is being typed. The server recalculates
 // everything on save with the real rules (api/src/invoice/totals.ts) and its numbers win.
-export function previewTotals(lines: { quantity: number; unitPrice: number; discount?: ItemDiscount | null }[], discountPercent: number, deliveryCharge: number, riderFee: number, payment: "paid" | "cod" | "unpaid") {
+export function previewTotals(lines: { quantity: number; unitPrice: number; discount?: ItemDiscount | null }[], discountPercent: number, deliveryCharge: number, riderFee: number, payment: "paid" | "cod" | "unpaid", storePays = false) {
   const subtotal = lines.reduce((n, l) => n + l.quantity * l.unitPrice - lineOff(l), 0);
   const discount = Math.round((subtotal * Math.min(Math.max(discountPercent, 0), 100)) / 100);
-  const total = subtotal - discount + deliveryCharge;
+  const total = subtotal - discount + (storePays ? 0 : deliveryCharge);
   const codAmount = payment === "cod" ? total : 0;
-  return { subtotal, discount, total, codAmount, collectAtDoor: codAmount + riderFee };
+  return { subtotal, discount, total, codAmount, collectAtDoor: codAmount + (storePays ? 0 : riderFee) };
 }
+
+/** The order as the customer sees it: delivery money the store pays is not shown to them at all. */
+export function forCustomer<T extends { deliveryPaidBy: "customer" | "store"; riderFee: number; deliveryCharge: number }>(order: T): T {
+  return order.deliveryPaidBy === "store" ? { ...order, riderFee: 0, deliveryCharge: 0 } : order;
+}
+
+/** What the store itself pays for delivery on this order (0 when the customer pays it). */
+export const deliveryCost = (o: { deliveryPaidBy: "customer" | "store"; riderFee: number; deliveryCharge: number }) => (o.deliveryPaidBy === "store" ? o.riderFee + o.deliveryCharge : 0);

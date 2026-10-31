@@ -27,7 +27,7 @@ const sendCsv = (res: Response, name: string, body: string) =>
 
 type StoreSales = {
   storeId: string; name: string; orders: number; returned: number; gross: number; discounts: number; deliveryFees: number;
-  netSales: number; returnedValue: number; codCollected: number; onlineReceived: number; riderFeesPassedOn: number;
+  netSales: number; returnedValue: number; codCollected: number; onlineReceived: number; riderFeesPassedOn: number; deliveryPaidByStore: number;
   costOfGoods: number; linesWithoutCost: number; salesWithCost: number; salesWithoutCost: number; profit: number; marginPercent: number | null;
 };
 
@@ -45,15 +45,16 @@ export function reportsRouter(db: Db): Router {
                    count(o.id) filter (where o.status = 'returned')::int as returned,
                    coalesce(sum(o.subtotal + ld.n), 0)::int as gross, -- goods before any discount (the lines' own discounts are added back)
                    coalesce(sum(o.discount + ld.n), 0)::int as discounts, -- the order discount plus the discounts on single items
-                   coalesce(sum(o.delivery_charge), 0)::int as delivery_fees,
+                   coalesce(sum(o.delivery_charge) filter (where o.delivery_paid_by = 'customer'), 0)::int as delivery_fees, -- only what the customers paid
                    coalesce(sum(o.total) filter (where o.status <> 'returned'), 0)::int as net_sales,
                    coalesce(sum(o.total) filter (where o.status = 'returned'), 0)::int as returned_value,
                    coalesce(sum(o.cod_amount) filter (where o.payment = 'cod' and o.payment_confirmed_at is not null), 0)::int as cod_collected,
                    coalesce(sum(o.total) filter (where o.payment = 'paid' and o.payment_confirmed_at is not null), 0)::int as online_received,
-                   coalesce(sum(o.rider_fee), 0)::int as rider_fees_passed_on,
+                   coalesce(sum(o.rider_fee) filter (where o.delivery_paid_by = 'customer'), 0)::int as rider_fees_passed_on,
+                   coalesce(sum(o.delivery_charge + o.rider_fee) filter (where o.delivery_paid_by = 'store'), 0)::int as delivery_paid_by_store, -- the store's own delivery cost, taken off profit
                    -- Profit is goods margin: what the items sold for (after the order's discount, shared across its lines) minus what
                    -- they cost. Only lines with a cost count; a line with no cost is unknown and is reported, never guessed.
-                   -- The cost is the one saved on the line when the order was made. Delivery and rider fees are left out.
+                   -- The cost is the one saved on the line when the order was made. Delivery the customer paid is left out; delivery the store paid is taken off.
                    coalesce((select sum(i.quantity * i.unit_cost) from order_items i join orders o2 on o2.id = i.order_id
                               where o2.store_id = s.id and o2.status not in ('cancelled', 'returned') and i.unit_cost is not null
                                 and (o2.created_at at time zone 'Asia/Karachi')::date between ${from}::date and ${to}::date), 0)::int as cost_of_goods,
@@ -74,7 +75,10 @@ export function reportsRouter(db: Db): Router {
              group by s.id order by s.created_at`,
       );
       if (storeId && stores.length === 0) throw new HttpError(404, "Store not found.");
-      const withProfit = (s: { salesWithCost: number; costOfGoods: number }) => ({ profit: s.salesWithCost - s.costOfGoods, marginPercent: s.salesWithCost > 0 ? Math.round(((s.salesWithCost - s.costOfGoods) * 1000) / s.salesWithCost) / 10 : null });
+      const withProfit = (s: { salesWithCost: number; costOfGoods: number; deliveryPaidByStore: number }) => {
+        const profit = s.salesWithCost - s.costOfGoods - s.deliveryPaidByStore;
+        return { profit, marginPercent: s.salesWithCost > 0 ? Math.round((profit * 1000) / s.salesWithCost) / 10 : null };
+      };
       for (const s of stores) Object.assign(s, withProfit(s));
       const bestSellers = await rows<{ storeName: string; name: string; quantity: number; amount: number }>(
         tx,
@@ -84,13 +88,13 @@ export function reportsRouter(db: Db): Router {
              group by s.name, i.name order by quantity desc, amount desc limit 10`,
       );
       const sum = (k: keyof StoreSales) => stores.reduce((n, s) => n + (s[k] as number), 0);
-      const totals = Object.fromEntries((["orders", "returned", "gross", "discounts", "deliveryFees", "netSales", "returnedValue", "codCollected", "onlineReceived", "riderFeesPassedOn", "costOfGoods", "linesWithoutCost", "salesWithCost", "salesWithoutCost"] as const).map((k) => [k, sum(k)]));
-      return { from, to, stores, totals: { ...totals, ...withProfit(totals as { salesWithCost: number; costOfGoods: number }) }, bestSellers };
+      const totals = Object.fromEntries((["orders", "returned", "gross", "discounts", "deliveryFees", "netSales", "returnedValue", "codCollected", "onlineReceived", "riderFeesPassedOn", "deliveryPaidByStore", "costOfGoods", "linesWithoutCost", "salesWithCost", "salesWithoutCost"] as const).map((k) => [k, sum(k)]));
+      return { from, to, stores, totals: { ...totals, ...withProfit(totals as { salesWithCost: number; costOfGoods: number; deliveryPaidByStore: number }) }, bestSellers };
     });
 
     if (!csv) return void res.json(result);
-    const head = ["Store", "Orders", "Returned", "Gross", "Discounts", "Delivery fees", "Net sales", "Returned value", "COD collected", "Online received", "Rider fees (to riders)", "Cost of goods", "Sales with a cost", "Sales without a cost (not in profit)", "Profit (goods margin)", "Margin %"];
-    const line = (name: string, s: Record<string, number>) => [name, s.orders!, s.returned!, s.gross!, s.discounts!, s.deliveryFees!, s.netSales!, s.returnedValue!, s.codCollected!, s.onlineReceived!, s.riderFeesPassedOn!, s.costOfGoods!, s.salesWithCost!, s.salesWithoutCost!, s.profit!, s.marginPercent ?? ""];
+    const head = ["Store", "Orders", "Returned", "Gross", "Discounts", "Delivery fees", "Net sales", "Returned value", "COD collected", "Online received", "Rider fees (to riders)", "Delivery paid by the store", "Cost of goods", "Sales with a cost", "Sales without a cost (not in profit)", "Profit (after delivery paid by the store)", "Margin %"];
+    const line = (name: string, s: Record<string, number>) => [name, s.orders!, s.returned!, s.gross!, s.discounts!, s.deliveryFees!, s.netSales!, s.returnedValue!, s.codCollected!, s.onlineReceived!, s.riderFeesPassedOn!, s.deliveryPaidByStore!, s.costOfGoods!, s.salesWithCost!, s.salesWithoutCost!, s.profit!, s.marginPercent ?? ""];
     const body = toCsv(head, [...result.stores.map((s) => line(s.name, s as unknown as Record<string, number>)), line("All stores", result.totals as Record<string, number>)]);
     sendCsv(res, `zindex-sales-${from}-to-${to}.csv`, body);
   });

@@ -6,7 +6,7 @@
 
 | Suite | Result |
 |---|---|
-| API tests (Vitest, real local PostgreSQL) | **184 passed**, 0 failed, 29 test files |
+| API tests (Vitest, real local PostgreSQL) | **196 passed**, 0 failed, 30 test files |
 | Browser tests (Playwright, against the production build) | **104 passed**, 0 failed: 52 tests, each run at desktop 1280 px and a 375 px phone view (includes the saved-invoice-picture comparison, the tour, the demo, the customer card following the order, and the cash views) |
 | Typecheck | web and API clean |
 | Production build (Next.js) | passes |

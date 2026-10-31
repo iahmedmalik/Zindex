@@ -30,7 +30,7 @@ One owner login per account in v1. No staff roles. Open sign-up is deliberately 
 | Messages | Seven editable WhatsApp templates per store and `wa.me` links. |
 | Payments | One ledger per order: expected, each payment, what is left. Pay later can be paid in chunks; COD cash can come back in chunks from a rider or a courier. Cash to collect has three buckets (with riders, from customers, from couriers), with age and a payment reminder. Money received is reported by the day it came in. Pay later at the door: the customer pays the rider's fee only; the order total is paid to the shop later. |
 | Deleting | A product can be deleted with no change to any past number. An order can be deleted at any stage, after a confirm card that lists what goes with it; its invoice number is given back when it was the store's latest, otherwise it stays missing; the owner chooses whether its stock goes back. Cancel keeps an order on record. Customers can be edited and deleted. |
-| Insight | Dashboard of what needs action today; sales, **profit per store** and stock reports with Excel files; complete backup download. Profit is goods margin (items sold minus their cost per piece; delivery and rider fees are not in it). The cost is saved on each order line when the order is made, so a later change to a product's cost only affects new sales. A line with no cost is left out of profit, reported as missing and listed under "Costs to fill in"; it is never guessed. |
+| Insight | Dashboard of what needs action today; sales, **profit per store** and stock reports with Excel files; complete backup download. Profit is goods margin (items sold minus their cost per piece) minus any delivery the shop paid itself; delivery the customer paid is not in it. The cost is saved on each order line when the order is made, so a later change to a product's cost only affects new sales. A line with no cost is left out of profit, reported as missing and listed under "Costs to fill in"; it is never guessed. |
 | Shopify | Import the orders export as pending orders, each with its invoice; read-only product sync. Stock is never synced. |
 
 ## Money rules (confirmed by the owner)
@@ -39,6 +39,7 @@ One owner login per account in v1. No staff roles. Open sign-up is deliberately 
 - Two kinds of delivery money. The **rider fee** (inDrive or Yango) is typed per parcel, paid by the recipient straight to the rider, and is never part of the shop's total. The **flat delivery fee** (courier) is part of the shop's total.
 - A customer either pays in full in advance (cash, Easypaisa, JazzCash, bank transfer) or pays on delivery. No deposits. When paid in advance, the recipient still pays the rider fee at the door.
 - What the recipient hands the rider = the cash-on-delivery amount + the rider fee. The shop receives only the goods total.
+- **Who pays for delivery** (added 31 Oct, owner's brother): on a rider or courier order the shop chooses *Customer* (the rules above, the default) or *We pay*. When the store pays, the customer's total is the goods only, nothing is collected for delivery and nothing about it is shown to the customer; the fee or charge typed is the store's own delivery cost and the profit report takes it off.
 
 ## Not in v1.0, on purpose
 

@@ -1,4 +1,4 @@
-import { offLabel, pkr, stageLabel } from "@/lib/format";
+import { forCustomer, offLabel, pkr, stageLabel } from "@/lib/format";
 import type { Order, Store } from "@/lib/types";
 
 const n = (x: number) => x.toLocaleString("en-US");
@@ -8,7 +8,8 @@ const n = (x: number) => x.toLocaleString("en-US");
  * remounts the chip (the key), which plays the arrival again. It carries the store's own email, phone and
  * address (set in the store's details), so what the owner sees is what a customer gets.
  */
-export function Receipt({ order, store }: { order: Order; store?: Store }) {
+export function Receipt({ order: placed, store }: { order: Order; store?: Store }) {
+  const order = forCustomer(placed); // delivery the store pays is not on the customer's slip
   const contact = [store?.email, store?.phone].filter(Boolean).join(" · ");
   return (
     <div className="slip" role="group" aria-label={`Receipt for order ${order.orderNo}`}>

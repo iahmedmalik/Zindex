@@ -36,7 +36,7 @@ export async function skipTour(page: Page) {
 export const freshPhone = () => `03${Math.floor(10 + Math.random() * 89)}${String(Date.now()).slice(-7)}`;
 
 /** Makes an order through the form and lands on its page. Typed item: 1,000 each, no catalogue needed. */
-export async function createOrder(page: Page, o: { name: string; phone?: string; qty?: number; discount?: number; rider?: string; pay?: "COD" | "Paid" | "Later"; kind?: "Courier" | "Pickup" } ) {
+export async function createOrder(page: Page, o: { name: string; phone?: string; qty?: number; discount?: number; rider?: string; pay?: "COD" | "Paid" | "Later"; kind?: "Courier" | "Pickup"; paidBy?: "store" } ) {
   await page.goto("/orders/new");
   await page.getByRole("radio", { name: "Sheen Food" }).check({ force: true }).catch(() => undefined);
   await page.getByLabel("WhatsApp number").fill(o.phone ?? freshPhone());
@@ -48,6 +48,7 @@ export async function createOrder(page: Page, o: { name: string; phone?: string;
   // Tap the visible label (the radio itself is hidden, and on a phone a bar can cover it), then check it took.
   if (o.kind) { await page.locator(".seg label", { hasText: new RegExp(`^${o.kind}$`) }).click(); await expect(page.getByRole("radio", { name: o.kind, exact: true })).toBeChecked(); }
   if (o.rider) await page.getByLabel(/Rider fee/).fill(o.rider);
+  if (o.paidBy === "store") { await page.locator(".seg label", { hasText: /^We pay$/ }).click(); await expect(page.getByRole("radio", { name: "We pay", exact: true })).toBeChecked(); }
   if (o.discount) await page.getByRole("button", { name: `${o.discount}%`, exact: true }).click();
   if (o.pay && o.pay !== "COD") { await page.locator(".seg label", { hasText: new RegExp(`^${o.pay}$`) }).click(); await expect(page.getByRole("radio", { name: o.pay, exact: true })).toBeChecked(); }
   await page.getByRole("button", { name: "Create order" }).click();

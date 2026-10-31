@@ -133,3 +133,28 @@ describe("a discount on one item", () => {
     expect(t).toMatchObject({ subtotal: 1800, total: 2050, codAmount: 2050, collectAtDoor: 2200 });
   });
 });
+
+describe("who pays for delivery", () => {
+  const goods = [{ quantity: 2, unitPrice: 1000 }]; // 2,000
+  it("customer pays a rider: the fee is collected at the door and is not in the total (as always)", () => {
+    const t = calculateTotals({ ...base, lines: goods, riderFee: 300, payment: "cod", deliveryPaidBy: "customer" });
+    expect(t).toMatchObject({ total: 2000, collectAtDoor: 2300, deliveryCost: 0 });
+  });
+  it("store pays a rider: nothing extra at the door and the fee is the store's cost", () => {
+    const t = calculateTotals({ ...base, lines: goods, riderFee: 300, payment: "cod", deliveryPaidBy: "store" });
+    expect(t).toMatchObject({ total: 2000, codAmount: 2000, collectAtDoor: 2000, deliveryCost: 300 });
+    expect(calculateTotals({ ...base, lines: goods, riderFee: 300, payment: "paid", deliveryPaidBy: "store" }).collectAtDoor).toBe(0);
+  });
+  it("customer pays a courier: the charge is in the total, paid with the order", () => {
+    const t = calculateTotals({ ...base, lines: goods, deliveryCharge: 250, payment: "cod", deliveryPaidBy: "customer" });
+    expect(t).toMatchObject({ total: 2250, collectAtDoor: 2250, deliveryCost: 0 });
+  });
+  it("store pays a courier: the total is goods only and the charge is the store's cost", () => {
+    const t = calculateTotals({ ...base, lines: goods, deliveryCharge: 250, payment: "cod", deliveryPaidBy: "store" });
+    expect(t).toMatchObject({ total: 2000, collectAtDoor: 2000, deliveryCost: 250 });
+  });
+  it("asking for nothing means the customer pays, so old callers do not change", () => {
+    const t = calculateTotals({ ...base, lines: goods, deliveryCharge: 250, riderFee: 0, payment: "unpaid" });
+    expect(t).toMatchObject({ total: 2250, deliveryCost: 0 });
+  });
+});

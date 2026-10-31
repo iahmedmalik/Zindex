@@ -1,5 +1,5 @@
 import { forwardRef } from "react";
-import { offLabel, pkr } from "@/lib/format";
+import { forCustomer, offLabel, pkr } from "@/lib/format";
 import type { Invoice, Order, Store } from "@/lib/types";
 
 export type InvoiceStore = Pick<Store, "name" | "phone" | "email" | "address" | "logoUrl" | "accent"> & Partial<Pick<Store, "watermarkUrl" | "watermarkOn">>;
@@ -27,9 +27,10 @@ function payWords(order: Order) {
  * the torn edge is an SVG strip. The paper stays light in dark mode on purpose.
  */
 export const InvoicePaper = forwardRef<HTMLElement, { invoice: Invoice; order: Order; store: InvoiceStore; size: "a4" | "compact" }>(function InvoicePaper(
-  { invoice, order, store, size },
+  { invoice, order: placed, store, size },
   ref,
 ) {
+  const order = forCustomer(placed); // delivery the store pays is not on the customer's invoice
   const date = new Date(invoice.finalisedAt ?? Date.now()).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
   const words = payWords(order);
   const chip = words.chip; // a draft already says DRAFT where the number goes

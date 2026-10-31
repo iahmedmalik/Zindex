@@ -7,7 +7,7 @@ import { PaymentsBox } from "@/components/payments-box";
 import { Receipt } from "@/components/receipt";
 import { DoneButton, Icon, Journey, Seg, useConfirm, useToast } from "@/components/ui";
 import { api, messageOf } from "@/lib/api";
-import { pkr, stageLabel } from "@/lib/format";
+import { deliveryCost, pkr, stageLabel } from "@/lib/format";
 import { shrinkImage, uploadPhoto } from "@/lib/image";
 import { useSession } from "@/lib/session";
 import type { Delivery, Invoice, Order, Stage } from "@/lib/types";
@@ -268,7 +268,8 @@ export default function OrderPage() {
             <Receipt order={order} store={store} />
             <div className="paper stack" style={{ gap: 6 }}>
               <b>{order.payment === "cod" ? "Cash on delivery" : order.payment === "paid" ? `Paid in advance${order.paymentMethod ? ` · ${order.paymentMethod}` : ""}` : "Pay later"}</b>
-              <span>{order.collectAtDoor === 0 ? "Nothing to collect at the door." : order.codAmount > 0 ? <>{order.customerName.split(" ")[0]} hands the rider <b className="num">{pkr(order.collectAtDoor)}</b>.{order.riderFee > 0 && <> The rider keeps {order.riderFee.toLocaleString("en-US")} and brings <b className="num">{order.codAmount.toLocaleString("en-US")}</b> back to you.</>}</> : <>The rider collects only his fee, <b className="num">{pkr(order.riderFee)}</b>.</>}</span>
+              <span>{order.collectAtDoor === 0 ? "Nothing to collect at the door." : order.codAmount > 0 ? <>{order.customerName.split(" ")[0]} hands the rider <b className="num">{pkr(order.collectAtDoor)}</b>.{order.riderFee > 0 && order.deliveryPaidBy === "customer" && <> The rider keeps {order.riderFee.toLocaleString("en-US")} and brings <b className="num">{order.codAmount.toLocaleString("en-US")}</b> back to you.</>}</> : <>The rider collects only his fee, <b className="num">{pkr(order.riderFee)}</b>.</>}</span>
+              {deliveryCost(order) > 0 && <span className="note">Delivery costs you {pkr(deliveryCost(order))}: you pay the {order.deliveryKind === "courier" ? "courier" : "rider"}. The customer does not see this.</span>}
               {!closed && (order.payment !== "cod" || order.status === "out_for_delivery" || order.status === "delivered") && <PaymentsBox base={base} order={order} busy={busy} onChange={load} />}
             </div>
           </section>
