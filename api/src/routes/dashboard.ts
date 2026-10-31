@@ -18,6 +18,7 @@ type Counts = {
   toPack: number;
   awaitingRider: number;
   outForDelivery: number;
+  readyForPickup: number;
   delivered: number;
   problems: number;
   cashOutstanding: number;
@@ -37,7 +38,8 @@ export function dashboardRouter(db: Db): Router {
               count(o.id) filter (where o.status = 'pending')::int as pending,
               count(o.id) filter (where o.status = 'confirmed')::int as to_pack,
               count(o.id) filter (where o.status = 'packed' and o.delivery_kind = 'local' and d.rider_name is null)::int as awaiting_rider,
-              count(o.id) filter (where o.status = 'out_for_delivery')::int as out_for_delivery,
+              count(o.id) filter (where o.status = 'out_for_delivery' and o.delivery_kind <> 'pickup')::int as out_for_delivery,
+              count(o.id) filter (where o.status = 'out_for_delivery' and o.delivery_kind = 'pickup')::int as ready_for_pickup,
               count(o.id) filter (where o.status = 'delivered')::int as delivered,
               count(o.id) filter (where o.status = 'returned')::int as problems,
               count(o.id) filter (where ((o.payment = 'cod' and o.cod_amount > 0 and o.status in ('out_for_delivery', 'delivered')) or (o.payment = 'unpaid' and o.status = 'delivered'))
@@ -57,7 +59,7 @@ export function dashboardRouter(db: Db): Router {
     res.json({
       stores: withAction,
       totals: {
-        pending: sum("pending"), toPack: sum("toPack"), awaitingRider: sum("awaitingRider"), outForDelivery: sum("outForDelivery"),
+        pending: sum("pending"), toPack: sum("toPack"), awaitingRider: sum("awaitingRider"), outForDelivery: sum("outForDelivery"), readyForPickup: sum("readyForPickup"),
         delivered: sum("delivered"), problems: sum("problems"), cashOutstanding: sum("cashOutstanding"), needsAction: sum("needsAction"),
         ordersToday: sum("ordersToday"), salesToday: sum("salesToday"),
       },

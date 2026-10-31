@@ -48,7 +48,7 @@ describe("whatsapp messages", () => {
     const store = await a.store();
     const other = await a.store();
     const order = await a.order(store);
-    expect((await a.templates(store)).body.templates).toHaveLength(7);
+    expect((await a.templates(store)).body.templates).toHaveLength(8); // the seven delivery messages and "ready for pickup"
     await a.edit(store, "thank_you", "Shukriya {name}! - {store}");
     expect((await a.message(store, order, "thank_you")).body.text).toMatch(/^Shukriya Ayesha! - Sheen Food/);
     expect((await a.templates(store)).body.templates.find((x: { key: string }) => x.key === "thank_you").edited).toBe(true);

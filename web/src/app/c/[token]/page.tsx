@@ -11,7 +11,7 @@ const fmt = (n: number) => n.toLocaleString("en-US");
 
 type Card = {
   store: { name: string; phone: string | null; email: string | null; address: string | null; hasLogo?: boolean; accent: string };
-  order: { orderNo: number; status: string; customerName: string; address: string | null; payment: string; items: { name: string; quantity: number }[]; subtotal: number; discount: number; deliveryCharge: number; total: number; riderFee: number; codAmount: number; collectAtDoor: number; paid: number };
+  order: { deliveryKind: string; pickupMapUrl: string | null; orderNo: number; status: string; customerName: string; address: string | null; payment: string; items: { name: string; quantity: number }[]; subtotal: number; discount: number; deliveryCharge: number; total: number; riderFee: number; codAmount: number; collectAtDoor: number; paid: number };
   delivery: { service: string | null; riderName: string | null; riderPhone: string | null; bikeNumber: string | null; riderPhotoUrl: string | null; hasPhoto: boolean; riderPhotoTakenAt: string | null; trackingUrl: string | null; riderScreenshotUrl: string | null } | null;
   shipment: { courier: string; trackingNo: string | null; trackingUrl: string | null; hasPhoto: boolean; photoTakenAt: string | null } | null;
   expiresAt: string;
@@ -21,6 +21,9 @@ type Card = {
 const steps = ["pending", "confirmed", "packed", "out_for_delivery", "delivered"];
 const label: Record<string, string> = { pending: "Ordered", confirmed: "Confirmed", packed: "Packed", out_for_delivery: "On the way", delivered: "Delivered" };
 const headline: Record<string, string> = { pending: "We got your order", confirmed: "Your order is confirmed", packed: "Your order is packed", out_for_delivery: "On its way to you", delivered: "Delivered. Enjoy!" };
+// A pickup keeps the same stored statuses but says "Ready" and "Picked up": nothing is on its way.
+const pickupLabel: Record<string, string> = { ...label, out_for_delivery: "Ready", delivered: "Picked up" };
+const pickupHeadline: Record<string, string> = { ...headline, out_for_delivery: "Ready for you to collect", delivered: "Picked up. Enjoy!" };
 const closedHeadline: Record<string, string> = { cancelled: "This order was cancelled", returned: "This order came back to the shop" };
 const Check = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5" /></svg>;
 const Phone = () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 4h3.5l1.5 4-2 1.5a11 11 0 0 0 6.5 6.5l1.5-2 4 1.5V19a1 1 0 0 1-1 1A16 16 0 0 1 4 5a1 1 0 0 1 1-1z" /></svg>;
@@ -56,6 +59,9 @@ export default async function CardPage({ params }: { params: Promise<{ token: st
   const until = new Date(card.expiresAt).toLocaleDateString("en-GB", { day: "numeric", month: "long", timeZone: "Asia/Karachi" });
   const wa = store.phone ? `https://wa.me/${store.phone.replace(/\D/g, "").replace(/^0/, "92")}` : null;
   const cancelled = order.status === "cancelled" || order.status === "returned";
+  const pickup = order.deliveryKind === "pickup";
+  const words = pickup ? pickupLabel : label;
+  const directions = pickup ? safeLink(order.pickupMapUrl) : null;
   const track = safeLink(delivery?.trackingUrl ?? shipment?.trackingUrl ?? null);
   const hasRider = !!delivery && (delivery.riderName || delivery.riderPhone);
   const photoSrc = delivery?.hasPhoto ? `/backend/v1/public/card/${encodeURIComponent(token)}/photo` : shipment?.hasPhoto ? `/backend/v1/public/card/${encodeURIComponent(token)}/shipment-photo` : safeLink(delivery?.riderPhotoUrl ?? null);
@@ -75,24 +81,38 @@ export default async function CardPage({ params }: { params: Promise<{ token: st
         </header>
 
         <section className="arrive" style={{ ["--i" as string]: 1 }}>
-          <h1 className="big">{cancelled ? closedHeadline[order.status] : headline[order.status]}</h1>
+          <h1 className="big">{cancelled ? closedHeadline[order.status] : (pickup ? pickupHeadline : headline)[order.status]}</h1>
           {order.status === "out_for_delivery" && delivery?.riderName && <p className="note-on">{delivery.riderName} has your parcel.</p>}
           {order.status === "out_for_delivery" && !delivery?.riderName && shipment && <p className="note-on">{shipment.courier} has your parcel.</p>}
         </section>
 
-        {order.status === "out_for_delivery" && <div className="arrive" style={{ ["--i" as string]: 2 }}><RouteMap /></div>}
+        {order.status === "out_for_delivery" && !pickup && <div className="arrive" style={{ ["--i" as string]: 2 }}><RouteMap /></div>}
 
         {!cancelled && (
           <ol className="journey card-journey arrive" style={{ ["--n" as string]: 5, ["--at" as string]: Math.max(0, at), ["--i" as string]: 2 }} aria-label="Delivery progress">
             {steps.map((s, i) => (
               <li key={s} className={i < at ? "done" : i === at ? "now" : ""} aria-current={i === at ? "step" : undefined}>
-                <span className="node">{i < at || (i === at && s === "delivered") ? <Check /> : i + 1}</span><span>{label[s]}</span>
+                <span className="node">{i < at || (i === at && s === "delivered") ? <Check /> : i + 1}</span><span>{words[s]}</span>
               </li>
             ))}
           </ol>
         )}
 
-        {hasRider && !cancelled && delivery && (
+        {pickup && !cancelled && (
+          <section className="white arrive" style={{ ["--i" as string]: 3 }} aria-label="Where to collect">
+            <b className="rider-name">Collect from {store.name}</b>
+            {store.address && <><br /><span className="note">{store.address}</span></>}
+          </section>
+        )}
+
+        {directions && !cancelled && order.status !== "delivered" && (
+          <div className="arrive" style={{ ["--i" as string]: 4, display: "grid", gap: 6 }}>
+            <a className="btn white-btn" href={directions} target="_blank" rel="noopener noreferrer"><Pin />Get directions</a>
+            <p className="note-on" style={{ textAlign: "center" }}>Opens Google Maps</p>
+          </div>
+        )}
+
+        {hasRider && !pickup && !cancelled && delivery && (
           <section className="white arrive" style={{ ["--i" as string]: 3 }} aria-label="Your rider">
             <div style={{ display: "grid", gridTemplateColumns: "auto 1fr auto", gap: 14, alignItems: "center" }}>
               <span aria-hidden="true" className="avatar">{(delivery.riderName ?? "R").slice(0, 1)}</span>
@@ -136,11 +156,11 @@ export default async function CardPage({ params }: { params: Promise<{ token: st
 
         {!cancelled && (
           <section className="slip arrive" style={{ ["--i" as string]: 6 }} aria-label="What to pay">
-            <h2>{order.collectAtDoor === 0 ? "Nothing to pay at the door" : "Please have ready"}</h2>
+            <h2>{order.collectAtDoor === 0 ? (pickup ? "Nothing to pay when you collect" : "Nothing to pay at the door") : "Please have ready"}</h2>
             {order.collectAtDoor > 0 && <p className="due num">PKR {fmt(order.collectAtDoor)}</p>}
             <p className="mut">{order.payment === "unpaid"
               ? `${order.riderFee > 0 ? "That is the rider's delivery fee. " : ""}Your order total of ${fmt(order.total)} is paid to ${store.name} later.`
-              : order.collectAtDoor === 0 ? "Your order is paid." : order.codAmount > 0 ? `${fmt(order.codAmount)} for your order${order.riderFee > 0 ? ` and ${fmt(order.riderFee)} for the rider` : ""}.` : "That is the rider's delivery fee. Your order is already paid."}</p>
+              : order.collectAtDoor === 0 ? "Your order is paid." : order.codAmount > 0 ? `${fmt(order.codAmount)} for your order${order.riderFee > 0 ? ` and ${fmt(order.riderFee)} for the rider` : ""}${pickup ? ", paid when you collect it" : ""}.` : "That is the rider's delivery fee. Your order is already paid."}</p>
             {order.items.map((i, n) => <div key={n} className="ln"><span>{i.quantity} × {i.name}</span></div>)}
             {order.discount > 0 && <div className="ln"><span>Discount</span><span className="num">− {fmt(order.discount)}</span></div>}
             {order.deliveryCharge > 0 && <div className="ln"><span>Delivery fee</span><span className="num">{fmt(order.deliveryCharge)}</span></div>}

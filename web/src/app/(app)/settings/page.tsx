@@ -13,7 +13,7 @@ type ShopifyState = { domain: string | null; connected: boolean; lastSync: strin
 type ImportResult = { imported: { ref: string; orderNo: number }[]; alreadyImported: string[]; skipped: { ref: string; reason: string }[]; warnings: { ref: string; reason: string }[] };
 // The first colour is what a new store starts with: the app's own maroon, the same as the database default.
 const storeColours = ["#5d1b23", "#8a3b12", "#1f3a5f", "#24523b", "#6b3a8a", "#2b2b2b"];
-const templateNames: Record<string, string> = { order_confirmed: "Order confirmed", invoice: "Invoice", rider_assigned: "Rider assigned", on_the_way: "On the way", delivered: "Delivered", payment_reminder: "Payment reminder", thank_you: "Thank you" };
+const templateNames: Record<string, string> = { order_confirmed: "Order confirmed", invoice: "Invoice", rider_assigned: "Rider assigned", on_the_way: "On the way", delivered: "Delivered", payment_reminder: "Payment reminder", thank_you: "Thank you", ready_for_pickup: "Ready for pickup" };
 
 /** Logo or watermark: a small picture per store, shrunk here first, shown on the invoice, receipt and the customer's card. */
 function PictureRow({ store, kind, onSaved }: { store: Store; kind: "logo" | "watermark"; onSaved: () => Promise<void> }) {

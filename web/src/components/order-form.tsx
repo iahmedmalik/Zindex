@@ -39,6 +39,7 @@ export function OrderForm({ edit }: { edit?: Order }) {
   const [discount, setDiscount] = useState(edit?.discountPercent ?? 0);
   const [kind, setKind] = useState<DeliveryKind>(edit?.deliveryKind ?? "local");
   const [paidBy, setPaidBy] = useState<"customer" | "store">(edit?.deliveryPaidBy ?? "customer");
+  const [mapUrl, setMapUrl] = useState(edit?.pickupMapUrl ?? "");
   const [riderFee, setRiderFee] = useState(edit?.riderFee ? String(edit.riderFee) : "");
   const [flatFee, setFlatFee] = useState(edit?.deliveryCharge ? String(edit.deliveryCharge) : "");
   const [payment, setPayment] = useState<Payment>(edit?.payment ?? "cod");
@@ -97,6 +98,7 @@ export function OrderForm({ edit }: { edit?: Order }) {
         deliveryKind: kind,
         riderFee: fee,
         deliveryPaidBy: kind === "pickup" ? "customer" : paidBy,
+        pickupMapUrl: kind === "pickup" ? mapUrl.trim() || null : null,
         deliveryCharge: flat,
         payment,
         paymentMethod: payment === "paid" ? method : payment === "cod" ? "Cash" : null,
@@ -199,6 +201,7 @@ export function OrderForm({ edit }: { edit?: Order }) {
         </div></div>
         <div className={`expand${kind === "local" ? " open" : ""}`}><div><label className="field"><span>{paidBy === "store" ? "Rider fee · we pay the rider, the customer is not charged" : "Rider fee · the customer pays the rider, not the store"}</span><input className="input num" inputMode="numeric" placeholder="0" value={riderFee} onChange={(e) => setRiderFee(e.target.value.replace(/\D/g, ""))} /></label></div></div>
         <div className={`expand${kind === "courier" ? " open" : ""}`}><div><label className="field"><span>{paidBy === "store" ? "Delivery cost · we pay the courier, not added to the total" : "Delivery fee · part of the store's total"}</span><input className="input num" inputMode="numeric" placeholder="0" value={flatFee} onChange={(e) => setFlatFee(e.target.value.replace(/\D/g, ""))} /></label></div></div>
+        <div className={`expand${kind === "pickup" ? " open" : ""}`}><div><label className="field"><span>Pickup location · paste a Google Maps link (optional)</span><input className="input" inputMode="url" placeholder="https://" value={mapUrl} onChange={(e) => setMapUrl(e.target.value)} /></label><p className="note">The customer gets a Get directions button on their card.</p></div></div>
         <div className={`expand${storePays && fee + flat > 0 ? " open" : ""}`}><div><p className="note">Customer pays {pkr(t.total)} for the goods. Delivery costs you {pkr(fee + flat)}.</p></div></div>
         <div className="field"><span>Discount</span>
           <div className="inline" role="group" aria-label="Discount">

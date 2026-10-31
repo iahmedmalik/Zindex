@@ -12,6 +12,10 @@ export const stageLabel: Record<Stage, string> = {
   cancelled: "Cancelled",
 };
 
+/** The stage as the shop and the customer call it: a pickup is "Ready for pickup" and "Picked up", never "Out for delivery" or "Delivered". The stored statuses are the same. */
+export const stageName = (s: Stage, kind?: string): string =>
+  kind === "pickup" ? ({ out_for_delivery: "Ready for pickup", delivered: "Picked up" } as Partial<Record<Stage, string>>)[s] ?? stageLabel[s] : stageLabel[s];
+
 export const when = (iso: string) => new Date(iso).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 
 /** What a discount on one item takes off the line (quantity x price): a percent of it, or rupees, never more than the line. */

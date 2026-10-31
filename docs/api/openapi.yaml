@@ -122,6 +122,7 @@ paths:
       parameters:
         - { name: q, in: query, schema: { type: string }, description: "Customer name, phone, or #number" }
         - { name: status, in: query, schema: { $ref: "#/components/schemas/Stage" } }
+        - { name: pickup, in: query, schema: { enum: ["1", "0"] }, description: "1 keeps pickup orders only, 0 leaves them out. out_for_delivery is shown as Ready for pickup and delivered as Picked up on a pickup order, so this tells the two apart." }
         - { name: payment, in: query, schema: { enum: [paid, cod, unpaid] } }
         - { name: method, in: query, schema: { type: string } }
       responses: { "200": { description: OK } }
@@ -271,6 +272,7 @@ components:
         deliveryKind: { enum: [local, courier, pickup] }
         deliveryCharge: { type: integer, description: The store's flat courier fee (part of the total) }
         riderFee: { type: integer, description: Paid by the recipient straight to the rider; never part of the total (unless the store pays it, see deliveryPaidBy) }
+        pickupMapUrl: { type: [string, "null"], description: "A Google Maps link (https only) for a pickup order; the customer's card shows it as a Get directions button. Ignored on other orders." }
         deliveryPaidBy: { enum: [customer, store], description: "Who pays for delivery on a rider or courier order. customer (the default) is the rule above. store: the total is goods only, nothing for delivery is collected or shown to the customer, and the fee or charge typed is the store's own cost, taken off profit in reports. Always customer on a pickup." }
         payment: { enum: [paid, cod, unpaid] }
         paymentMethod: { type: [string, "null"] }

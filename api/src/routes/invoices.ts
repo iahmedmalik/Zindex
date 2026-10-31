@@ -12,7 +12,7 @@ type Invoice = { id: string; orderId: string; storeId: string; status: "draft" |
 const invoiceCols = sql`id, order_id, store_id, status, number, finalised_at, created_at`;
 
 // The order fields an invoice shows. A change to any of these after the invoice is final is logged.
-const watched = ["customerName", "customerPhone", "address", "deliveryKind", "payment", "paymentMethod", "discountPercent", "deliveryCharge", "riderFee", "deliveryPaidBy", "notes", "total", "items"] as const;
+const watched = ["customerName", "customerPhone", "address", "deliveryKind", "payment", "paymentMethod", "discountPercent", "deliveryCharge", "riderFee", "deliveryPaidBy", "pickupMapUrl", "notes", "total", "items"] as const;
 
 /**
  * Called by the order editor. While the order is still being prepared its invoice simply follows it; once the order is

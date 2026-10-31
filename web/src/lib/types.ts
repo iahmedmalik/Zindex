@@ -25,6 +25,7 @@ export type Order = {
   deliveryCharge: number;
   riderFee: number;
   deliveryPaidBy: "customer" | "store";
+  pickupMapUrl: string | null;
   subtotal: number;
   discount: number;
   total: number;
@@ -70,6 +71,7 @@ export type BoardCounts = {
   toPack: number;
   awaitingRider: number;
   outForDelivery: number;
+  readyForPickup: number;
   delivered: number;
   problems: number;
   cashOutstanding: number;

@@ -7,12 +7,13 @@ import { PaymentsBox } from "@/components/payments-box";
 import { Receipt } from "@/components/receipt";
 import { DoneButton, Icon, Journey, Seg, useConfirm, useToast } from "@/components/ui";
 import { api, messageOf } from "@/lib/api";
-import { deliveryCost, pkr, stageLabel } from "@/lib/format";
+import { deliveryCost, pkr, stageLabel, stageName } from "@/lib/format";
 import { shrinkImage, uploadPhoto } from "@/lib/image";
 import { useSession } from "@/lib/session";
 import type { Delivery, Invoice, Order, Stage } from "@/lib/types";
 
 const steps = ["Ordered", "Confirmed", "Packed", "On the way", "Delivered"];
+const pickupSteps = ["Ordered", "Confirmed", "Packed", "Ready for pickup", "Picked up"];
 const stepOf: Record<Stage, number> = { pending: 0, confirmed: 1, packed: 2, out_for_delivery: 3, delivered: 4, returned: 4, cancelled: 0 };
 const next: Partial<Record<Stage, { to: Stage; label: string }>> = {
   pending: { to: "confirmed", label: "Confirm order" },
@@ -20,7 +21,13 @@ const next: Partial<Record<Stage, { to: Stage; label: string }>> = {
   packed: { to: "out_for_delivery", label: "Out for delivery" },
   out_for_delivery: { to: "delivered", label: "Mark delivered" },
 };
-const templates = [["order_confirmed", "Order confirmed"], ["invoice", "Invoice"], ["rider_assigned", "Rider assigned"], ["on_the_way", "On the way"], ["delivered", "Delivered"], ["payment_reminder", "Payment reminder"], ["thank_you", "Thank you"]] as const;
+const pickupNext: Partial<Record<Stage, { to: Stage; label: string }>> = {
+  ...next,
+  packed: { to: "out_for_delivery", label: "Ready for pickup" },
+  out_for_delivery: { to: "delivered", label: "Mark picked up" },
+};
+const templates = [["order_confirmed", "Order confirmed"], ["invoice", "Invoice"], ["rider_assigned", "Rider assigned"], ["on_the_way", "On the way"], ["delivered", "Delivered"], ["payment_reminder", "Payment reminder"], ["thank_you", "Thank you"], ["ready_for_pickup", "Ready for pickup"]] as const;
+const pickupMessages: string[] = ["order_confirmed", "invoice", "ready_for_pickup", "payment_reminder", "thank_you"];
 
 type DeliveryState = { delivery: Delivery | null };
 type Shipment = { courier: string; trackingNo: string | null; trackingUrl: string | null; shippedOn: string | null; hasPhoto: boolean };
@@ -94,13 +101,14 @@ export default function OrderPage() {
   const move = (to: Stage) => run(async () => {
     const r = await api<{ stockWarnings?: { name: string; onHand: number }[] }>(`${base}/status`, { method: "POST", body: { status: to } });
     const warn = r.stockWarnings?.length ? ` · below zero: ${r.stockWarnings.map((w) => `${w.name} (${w.onHand})`).join(", ")}` : "";
-    return `#${order!.orderNo} is ${stageLabel[to].toLowerCase()}${warn}`;
+    return `#${order!.orderNo} is ${stageName(to, order!.deliveryKind).toLowerCase()}${warn}`;
   });
   const copy = async (text: string) => { await navigator.clipboard.writeText(text); };
 
   if (!order) return error ? <p className="error" role="alert">{error}</p> : <div className="skel" aria-busy="true"><span /><span /><span /></div>;
   const closed = order.status === "cancelled" || order.status === "returned";
-  const step = next[order.status];
+  const pickup = order.deliveryKind === "pickup";
+  const step = (pickup ? pickupNext : next)[order.status];
   const at = stepOf[order.status];
   const owing = order.expected - order.paid;
   const cashDue = ((order.payment === "cod" && order.codAmount > 0) || order.payment === "unpaid") && order.status === "delivered" && owing > 0;
@@ -122,7 +130,7 @@ export default function OrderPage() {
         </div>
       </section>
 
-      {order.status !== "cancelled" && <Journey label="Order progress" steps={steps} at={order.status === "delivered" || order.status === "returned" ? 5 : at} />}
+      {order.status !== "cancelled" && <Journey label="Order progress" steps={pickup ? pickupSteps : steps} at={order.status === "delivered" || order.status === "returned" ? 5 : at} />}
 
       <div className="split">
         <div className="stack" style={{ gap: 28 }}>
@@ -248,7 +256,7 @@ export default function OrderPage() {
                 <button className="linkbtn" style={{ justifySelf: "start" }} disabled={busy} onClick={async () => { if (!(await confirmCard({ title: "Make a new link?", body: <p>The old link will stop working.</p>, confirm: "Make a new link" })).ok) return; void run(async () => { await api(`${base}/card`, { method: "POST", body: {} }); return "New delivery card link made · the old one is off"; }).catch(() => undefined); }}>Make a new link</button>
               )}
               <div className="chips">
-                {templates.map(([key, label]) => (
+                {templates.filter(([key]) => (pickup ? pickupMessages.includes(key) : key !== "ready_for_pickup")).map(([key, label]) => (
                   <button key={key} className="chip" disabled={!order.customerPhone} onClick={async () => {
                     try {
                       const m = await api<{ waLink: string }>(`${base}/whatsapp?template=${key}&link=${encodeURIComponent(cardUrl)}`);
@@ -268,7 +276,7 @@ export default function OrderPage() {
             <Receipt order={order} store={store} />
             <div className="paper stack" style={{ gap: 6 }}>
               <b>{order.payment === "cod" ? "Cash on delivery" : order.payment === "paid" ? `Paid in advance${order.paymentMethod ? ` · ${order.paymentMethod}` : ""}` : "Pay later"}</b>
-              <span>{order.collectAtDoor === 0 ? "Nothing to collect at the door." : order.codAmount > 0 ? <>{order.customerName.split(" ")[0]} hands the rider <b className="num">{pkr(order.collectAtDoor)}</b>.{order.riderFee > 0 && order.deliveryPaidBy === "customer" && <> The rider keeps {order.riderFee.toLocaleString("en-US")} and brings <b className="num">{order.codAmount.toLocaleString("en-US")}</b> back to you.</>}</> : <>The rider collects only his fee, <b className="num">{pkr(order.riderFee)}</b>.</>}</span>
+              <span>{pickup ? (order.collectAtDoor === 0 ? "Nothing to collect when they come." : <>{order.customerName.split(" ")[0]} pays <b className="num">{pkr(order.collectAtDoor)}</b> when collecting.</>) : order.collectAtDoor === 0 ? "Nothing to collect at the door." : order.codAmount > 0 ? <>{order.customerName.split(" ")[0]} hands the rider <b className="num">{pkr(order.collectAtDoor)}</b>.{order.riderFee > 0 && order.deliveryPaidBy === "customer" && <> The rider keeps {order.riderFee.toLocaleString("en-US")} and brings <b className="num">{order.codAmount.toLocaleString("en-US")}</b> back to you.</>}</> : <>The rider collects only his fee, <b className="num">{pkr(order.riderFee)}</b>.</>}</span>
               {deliveryCost(order) > 0 && <span className="note">Delivery costs you {pkr(deliveryCost(order))}: you pay the {order.deliveryKind === "courier" ? "courier" : "rider"}. The customer does not see this.</span>}
               {!closed && (order.payment !== "cod" || order.status === "out_for_delivery" || order.status === "delivered") && <PaymentsBox base={base} order={order} busy={busy} onChange={load} />}
             </div>

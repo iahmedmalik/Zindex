@@ -1,4 +1,4 @@
-import { forCustomer, offLabel, pkr, stageLabel } from "@/lib/format";
+import { forCustomer, offLabel, pkr, stageName } from "@/lib/format";
 import type { Order, Store } from "@/lib/types";
 
 const n = (x: number) => x.toLocaleString("en-US");
@@ -31,7 +31,7 @@ export function Receipt({ order: placed, store }: { order: Order; store?: Store 
       {order.riderFee > 0 && <div className="ln"><span>Rider fee (to the rider)</span><span className="num">+ {n(order.riderFee)}</span></div>}
       {order.collectAtDoor > 0 && <div className="ln tot" style={{ borderTopStyle: "solid" }}><span>AT THE DOOR</span><span className="num">{pkr(order.collectAtDoor)}</span></div>}
       {store?.address && <div className="ln mut contact"><span>{store.address}</span></div>}
-      <span key={order.status} className="slipchip"><i />{stageLabel[order.status]}</span>
+      <span key={order.status} className="slipchip"><i />{stageName(order.status, order.deliveryKind)}</span>
     </div>
   );
 }

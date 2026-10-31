@@ -44,6 +44,7 @@ const fields = {
   deliveryCharge: money,
   riderFee: money,
   deliveryPaidBy: z.enum(["customer", "store"]),
+  pickupMapUrl: z.string().trim().url().regex(/^https:\/\//, "use a https:// link").max(500).nullable(),
   deliveryKind: z.enum(["local", "courier", "pickup"]),
   payment: z.enum(["paid", "cod", "unpaid"]),
   paymentMethod: z.string().trim().min(1).max(40).nullable(),
@@ -61,6 +62,7 @@ const createBody = z
     deliveryCharge: fields.deliveryCharge.optional(),
     riderFee: fields.riderFee.optional(),
     deliveryPaidBy: fields.deliveryPaidBy.optional(),
+    pickupMapUrl: fields.pickupMapUrl.optional(),
     deliveryKind: fields.deliveryKind.optional(),
     payment: fields.payment.optional(),
     paymentMethod: fields.paymentMethod.optional(),
@@ -91,6 +93,7 @@ export type Order = {
   deliveryCharge: number;
   riderFee: number;
   deliveryPaidBy: "customer" | "store";
+  pickupMapUrl: string | null;
   subtotal: number;
   discount: number;
   total: number;
@@ -113,7 +116,7 @@ export type Order = {
 
 const orderSelect = sql`
   o.id, o.store_id, o.order_no, o.customer_id, o.customer_name, o.customer_phone, o.address, o.source, o.status,
-  o.delivery_kind, o.payment, o.payment_method, o.discount_percent, o.delivery_charge, o.rider_fee, o.delivery_paid_by, o.subtotal,
+  o.delivery_kind, o.payment, o.payment_method, o.discount_percent, o.delivery_charge, o.rider_fee, o.delivery_paid_by, o.pickup_map_url, o.subtotal,
   o.discount, o.total, o.cod_amount, o.collect_at_door, o.amount_due, o.notes, o.stock_applied, o.payment_confirmed_at, o.delivered_at, o.external_ref, o.created_at, o.updated_at,
   case when o.payment = 'cod' then o.cod_amount else o.total end as expected,
   coalesce((select sum(p.amount) from order_payments p where p.order_id = o.id), 0)::int as paid,
@@ -254,10 +257,10 @@ export async function insertOrder(tx: Tx, storeId: string, b: NewOrder, key: str
   const id = (await rows<{ id: string }>(
     tx,
     sql`insert into orders (store_id, order_no, customer_id, customer_name, customer_phone, address, source, delivery_kind, payment,
-          payment_method, discount_percent, delivery_charge, rider_fee, delivery_paid_by, subtotal, discount, total, cod_amount, collect_at_door,
+          payment_method, discount_percent, delivery_charge, rider_fee, delivery_paid_by, pickup_map_url, subtotal, discount, total, cod_amount, collect_at_door,
           amount_due, notes, idempotency_key, external_ref)
         values (${storeId}, ${orderNo}, ${customerId}, ${b.customerName}, ${phone}, ${b.address ?? null}, ${b.source ?? "whatsapp"},
-          ${b.deliveryKind ?? "local"}, ${v.payment}, ${b.paymentMethod ?? null}, ${v.discountPercent}, ${v.deliveryCharge}, ${v.riderFee}, ${v.deliveryPaidBy},
+          ${b.deliveryKind ?? "local"}, ${v.payment}, ${b.paymentMethod ?? null}, ${v.discountPercent}, ${v.deliveryCharge}, ${v.riderFee}, ${v.deliveryPaidBy}, ${(b.deliveryKind ?? "local") === "pickup" ? (b.pickupMapUrl ?? null) : null},
           ${t.subtotal}, ${t.discount}, ${t.total}, ${t.codAmount}, ${t.collectAtDoor}, ${t.amountDue}, ${b.notes ?? null}, ${key}, ${b.externalRef ?? null})
         returning id`,
   ))[0]!.id;
@@ -276,6 +279,8 @@ export function ordersRouter(db: Db, config: Config): Router {
     const digits = normalisePhone(q);
     const status = typeof req.query.status === "string" ? req.query.status : "";
     if (status && !(stages as readonly string[]).includes(status)) throw new HttpError(400, "Unknown status.");
+    // "pickup=1" keeps pickup orders only, "pickup=0" leaves them out: Out for delivery / Ready for pickup (and Delivered / Picked up) are the same stored status.
+    const pickup = req.query.pickup === "1" ? "1" : req.query.pickup === "0" ? "0" : "";
     const payment = typeof req.query.payment === "string" ? req.query.payment : "";
     if (payment && !["paid", "cod", "unpaid"].includes(payment)) throw new HttpError(400, "Unknown payment.");
     const method = typeof req.query.method === "string" ? req.query.method : "";
@@ -290,6 +295,7 @@ export function ordersRouter(db: Db, config: Config): Router {
         sql`select ${orderSelect} from orders o
             where o.store_id = ${storeId}
               and (${status} = '' or o.status = ${status})
+              and (${pickup} = '' or (${pickup} = '1') = (o.delivery_kind = 'pickup'))
               and (${payment} = '' or o.payment = ${payment})
               and (${method} = '' or o.payment_method = ${method})
               and (${view} <> 'needs_rider' or (o.status = 'packed' and o.delivery_kind = 'local'
@@ -410,6 +416,7 @@ export function ordersRouter(db: Db, config: Config): Router {
               delivery_kind = ${b.deliveryKind ?? current.deliveryKind}, payment = ${v.payment},
               payment_method = ${"paymentMethod" in b ? (b.paymentMethod ?? null) : current.paymentMethod},
               discount_percent = ${v.discountPercent}, delivery_charge = ${v.deliveryCharge}, rider_fee = ${v.riderFee}, delivery_paid_by = ${v.deliveryPaidBy},
+              pickup_map_url = ${(b.deliveryKind ?? current.deliveryKind) === "pickup" ? ("pickupMapUrl" in b ? (b.pickupMapUrl ?? null) : current.pickupMapUrl) : null},
               subtotal = ${t.subtotal}, discount = ${t.discount}, total = ${t.total}, cod_amount = ${t.codAmount},
               collect_at_door = ${t.collectAtDoor}, amount_due = ${t.amountDue},
               notes = ${"notes" in b ? (b.notes ?? null) : current.notes}, updated_at = now()

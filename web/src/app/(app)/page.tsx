@@ -80,7 +80,8 @@ export default function TodayPage() {
 
   const c: BoardCounts = storeId ? (board.stores.find((s) => s.storeId === storeId) ?? board.totals) : board.totals;
   const needs = orders.filter((o) => o.status === "pending" || o.status === "confirmed" || o.status === "packed");
-  const onWay = orders.filter((o) => o.status === "out_for_delivery");
+  const onWay = orders.filter((o) => o.status === "out_for_delivery" && o.deliveryKind !== "pickup");
+  const readyPickup = orders.filter((o) => o.status === "out_for_delivery" && o.deliveryKind === "pickup");
   const todayKey = new Date(Date.now() + 5 * 3600_000).toISOString().slice(0, 10);
   const doneToday = orders.filter((o) => o.status === "delivered" && new Date(new Date(o.createdAt).getTime() + 5 * 3600_000).toISOString().slice(0, 10) === todayKey);
   const date = new Date().toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" });
@@ -153,6 +154,23 @@ export default function TodayPage() {
                     <span className="stage out_for_delivery" aria-hidden="true" />
                     <span><span className="ttl">#{o.orderNo} {o.customerName}</span><br /><span className="meta">{!storeId && `${o.storeName} · `}{o.deliveryKind === "courier" ? "with the courier" : "with the rider"}</span></span>
                     <span className="end"><span className="amt num">{pkr(o.collectAtDoor)}</span><span className="meta">at the door</span></span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
+        {readyPickup.length > 0 && (
+          <section className="section">
+            <header><h2>Ready for pickup</h2><Link className="linkbtn" href="/orders?status=ready_for_pickup">See all</Link></header>
+            <ul className="rows">
+              {readyPickup.map((o, i) => (
+                <li key={o.id} className="arrive" style={{ ["--i" as string]: i }}>
+                  <Link className="row" href={`/orders/${o.storeId}/${o.id}`}>
+                    <span className="stage out_for_delivery" aria-hidden="true" />
+                    <span><span className="ttl">#{o.orderNo} {o.customerName}</span><br /><span className="meta">{!storeId && `${o.storeName} · `}waiting at the shop</span></span>
+                    <span className="end"><span className="amt num">{pkr(o.collectAtDoor)}</span><span className="meta">{o.collectAtDoor > 0 ? "to collect" : "paid"}</span></span>
                   </Link>
                 </li>
               ))}

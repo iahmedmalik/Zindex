@@ -6,12 +6,18 @@ import { useEffect, useState } from "react";
 import { Picker } from "@/components/Picker";
 import { Icon, useToast } from "@/components/ui";
 import { api, messageOf } from "@/lib/api";
-import { pkr, stageLabel, when } from "@/lib/format";
+import { pkr, stageLabel, stageName, when } from "@/lib/format";
 import { useSession } from "@/lib/session";
 import type { Order, Stage } from "@/lib/types";
 
-const filters: (Stage | "")[] = ["", "pending", "confirmed", "packed", "out_for_delivery", "delivered", "returned", "cancelled"];
-const stageOptions = filters.map((f) => ({ value: f, label: f ? stageLabel[f] : "All" }));
+// "Out for delivery" and "Ready for pickup" (and "Delivered" and "Picked up") are the same stored status; the filter tells
+// them apart by whether the order is a pickup.
+type Filter = Stage | "ready_for_pickup" | "picked_up" | "";
+const filters: Filter[] = ["", "pending", "confirmed", "packed", "out_for_delivery", "ready_for_pickup", "delivered", "picked_up", "returned", "cancelled"];
+const filterLabel = (f: Filter) => (f === "" ? "All" : f === "ready_for_pickup" ? "Ready for pickup" : f === "picked_up" ? "Picked up" : stageLabel[f]);
+const stageOptions = filters.map((f) => ({ value: f, label: filterLabel(f) }));
+const query = (f: Filter): [string, string | null] =>
+  f === "ready_for_pickup" ? ["out_for_delivery", "1"] : f === "picked_up" ? ["delivered", "1"] : f === "out_for_delivery" || f === "delivered" ? [f, "0"] : [f, null];
 // The views the Today tiles open. They combine with the stage and payment dropdowns.
 const views = { needs_rider: "Needs a rider", cash: "Cash to collect", delivered_today: "Delivered today" } as const;
 type View = keyof typeof views | "";
@@ -28,7 +34,7 @@ const payOptions = [{ value: "", label: "Any" }, { value: "cod", label: "COD" },
 export default function OrdersPage() {
   const { stores, storeId } = useSession();
   const [q, setQ] = useState("");
-  const [status, setStatus] = useState<Stage | "">("");
+  const [status, setStatus] = useState<Filter>("");
   const [payment, setPayment] = useState("");
   const [view, setView] = useState<View>("");
   const [bucket, setBucket] = useState("");
@@ -41,7 +47,7 @@ export default function OrdersPage() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const fromUrl = params.get("status");
-    if (fromUrl && (filters as string[]).includes(fromUrl)) setStatus(fromUrl as Stage);
+    if (fromUrl && (filters as string[]).includes(fromUrl)) setStatus(fromUrl as Filter);
     const v = params.get("view");
     if (v && v in views) setView(v as View);
     const bk = params.get("bucket");
@@ -56,7 +62,9 @@ export default function OrdersPage() {
         const targets = storeId ? stores.filter((s) => s.id === storeId) : stores;
         const qs = new URLSearchParams();
         if (q.trim()) qs.set("q", q.trim());
-        if (status) qs.set("status", status);
+        const [st, pk] = query(status);
+        if (st) qs.set("status", st);
+        if (pk) qs.set("pickup", pk);
         if (payment) qs.set("payment", payment);
         if (view) qs.set("view", view);
         if (view === "cash" && bucket) qs.set("bucket", bucket);
@@ -144,7 +152,7 @@ export default function OrdersPage() {
                 </span>
                 <span className="end">
                   <span className="amt num">{pkr(o.total)}</span>
-                  <span className="badge">{stageLabel[o.status]}</span>
+                  <span className="badge">{stageName(o.status, o.deliveryKind)}</span>
                 </span>
               </Link>
               )}
