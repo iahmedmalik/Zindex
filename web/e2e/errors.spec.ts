@@ -15,7 +15,7 @@ test.describe("when a page breaks while it draws", () => {
     await page.goto("/orders");
     const panel = page.getByRole("alert").filter({ hasText: "Something went wrong" });
     await expect(panel).toBeVisible();
-    await expect(panel.getByText("That's on us, not you.", { exact: false })).toBeVisible();
+    await expect(panel.getByText(/That.s on us, not you\./)).toBeVisible();
     await expect(panel.getByRole("button", { name: "Try again" })).toBeVisible();
     await expect(panel.getByRole("link", { name: "Go to Today" })).toBeVisible();
   });
