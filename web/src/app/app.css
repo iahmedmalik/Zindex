@@ -259,3 +259,12 @@
   :root:not([data-motion="full"]) :is(.wake-van, .wake-pin, .wake-dot, .wake-tick-mark) { animation: none; }
   :root:not([data-motion="full"]) .wake-tick-mark { stroke-dashoffset: 0; }
 }
+
+/* ---------- the error screen (error.tsx): a calm card with "Try again" ---------- */
+.err-panel { width: min(100%, 420px); gap: 10px; }
+.err-ico { width: 48px; height: 48px; border-radius: var(--r-md); display: grid; place-items: center; color: var(--bad); background: color-mix(in srgb, var(--bad) 14%, transparent); margin-bottom: 4px; }
+.err-panel h1 { font-size: var(--t-lg); }
+.err-panel .btn { width: 100%; }
+.err-count { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 4px; }
+.err-ref { text-align: center; }
+.err-solo { align-content: center; }
