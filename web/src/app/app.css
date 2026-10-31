@@ -237,3 +237,25 @@
 
 /* An item with a discount shows what it was, struck through, before what it is now (receipt and invoice). */
 .ivp .iv-amt s, .slip .num s { opacity: 0.55; margin-right: 7px; font-weight: 400; }
+
+/* ---------- waking the free server: the sign-in card and the bar inside the app ---------- */
+.wake { gap: 6px; }
+.wake .btn { justify-self: stretch; margin-top: 8px; }
+.wake-trip { display: block; width: 100%; height: 64px; margin: 6px 0 2px; overflow: visible; }
+.wake-van { animation: wake-drive 6s var(--ease) infinite; }
+.wake-pin { transform-box: fill-box; transform-origin: 50% 100%; animation: g-beat 1.6s var(--ease) infinite; }
+@keyframes wake-drive { 0% { transform: translateX(-6px); } 78%, 100% { transform: translateX(190px); } }
+.wake-tick { display: flex; justify-content: space-between; align-items: baseline; }
+.wake-tick b { font-family: var(--font-display); font-weight: 600; }
+.wake-ok { display: flex; align-items: center; gap: 10px; color: var(--ok); font-weight: 600; }
+.wake-tick-mark { stroke-dasharray: 24; stroke-dashoffset: 24; animation: g-draw var(--t-enter) var(--ease) forwards; }
+.wakeable .btn[disabled], .wakeable .demo-link[disabled] { opacity: 0.45; }
+.wakebar { position: fixed; z-index: 60; top: max(12px, env(safe-area-inset-top)); left: 12px; right: 12px; margin-inline: auto; max-width: 420px; display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: var(--r-md); background: var(--surface); box-shadow: var(--shadow-pop); font-size: var(--t-sm); animation: arrive var(--t-enter) var(--ease) both; }
+.wakebar.leaving { animation: depart var(--t-base) var(--ease-out) both; }
+.wake-dot { width: 8px; height: 8px; flex: none; border-radius: 50%; background: var(--brand-hi); animation: g-beat 1.2s var(--ease) infinite; }
+:root[data-motion="reduced"] :is(.wake-van, .wake-pin, .wake-dot, .wake-tick-mark) { animation: none; }
+:root[data-motion="reduced"] .wake-tick-mark { stroke-dashoffset: 0; }
+@media (prefers-reduced-motion: reduce) {
+  :root:not([data-motion="full"]) :is(.wake-van, .wake-pin, .wake-dot, .wake-tick-mark) { animation: none; }
+  :root:not([data-motion="full"]) .wake-tick-mark { stroke-dashoffset: 0; }
+}

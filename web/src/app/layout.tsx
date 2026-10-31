@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Figtree, Outfit } from "next/font/google";
+import { WakeBar } from "@/components/wake";
 import { bootScript } from "@/lib/appearance";
 import "./globals.css";
 import "./app.css";
@@ -32,7 +33,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         {/* Applies the saved theme before the first paint, so there is no flash of the wrong colours. */}
         <script dangerouslySetInnerHTML={{ __html: bootScript }} />
       </head>
-      <body>{children}</body>
+      <body>
+        {children}
+        <WakeBar />
+      </body>
     </html>
   );
 }

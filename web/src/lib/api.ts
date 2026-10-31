@@ -19,7 +19,30 @@ const WAKE_TRIES = 15;
 const WAKE_PAUSE_MS = 4000;
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+// While a read is waiting for the server to wake, the "Waking the server…" bar shows (see WakeBar). A count,
+// not a flag, because several reads can be waiting at once.
+export const WAKING_EVENT = "zindex:waking";
+let waiting = 0;
+function announce(delta: 1 | -1) {
+  waiting += delta;
+  if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent(WAKING_EVENT, { detail: waiting > 0 }));
+}
+
 export async function api<T = unknown>(path: string, init: Init = {}): Promise<T> {
+  let announced = false;
+  try {
+    return await request<T>(path, init, () => {
+      if (!announced) {
+        announced = true;
+        announce(1);
+      }
+    });
+  } finally {
+    if (announced) announce(-1);
+  }
+}
+
+async function request<T>(path: string, init: Init, asleepNow: () => void): Promise<T> {
   const method = init.method ?? "GET";
   const tries = method === "GET" ? WAKE_TRIES : 1;
   for (let attempt = 1; ; attempt++) {
@@ -46,6 +69,7 @@ export async function api<T = unknown>(path: string, init: Init = {}): Promise<T
         return data as T;
       }
     }
+    asleepNow();
     await sleep(WAKE_PAUSE_MS);
   }
 }
