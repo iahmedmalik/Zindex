@@ -1,0 +1,7 @@
+name = "zindex-pinger"
+main = "src/index.js"
+compatibility_date = "2026-10-01"
+
+# Cron times are UTC. Pakistan is UTC+5, so these three lines are 10:50 to 22:00 in Pakistan, every 5 minutes.
+[triggers]
+crons = ["50,55 5 * * *", "*/5 6-16 * * *", "0 17 * * *"]

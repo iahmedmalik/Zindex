@@ -29,7 +29,7 @@ export function createApp(ctx?: AppContext): Express {
 
   app.use(express.json({ limit: "16kb" }));
 
-  // The pinger calls this every 10 minutes to keep the free Render service awake.
+  // The Cloudflare pinger calls this every 5 minutes in shop hours to keep the free Render service awake.
   app.get("/health", (_req, res) => {
     res.json({ status: "ok" });
   });
