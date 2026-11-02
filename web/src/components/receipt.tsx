@@ -1,4 +1,4 @@
-import { forCustomer, offLabel, pkr, stageName } from "@/lib/format";
+import { deliveryShown, forCustomer, offLabel, stageName, totalShown } from "@/lib/format";
 import type { Order, Store } from "@/lib/types";
 
 const n = (x: number) => x.toLocaleString("en-US");
@@ -26,10 +26,8 @@ export function Receipt({ order: placed, store }: { order: Order; store?: Store 
         </div>
       ))}
       {order.discount > 0 && <div className="ln"><span>Discount {order.discountPercent}%</span><span className="num">− {n(order.discount)}</span></div>}
-      {order.deliveryCharge > 0 && <div className="ln"><span>Delivery fee</span><span className="num">{n(order.deliveryCharge)}</span></div>}
-      <div className="ln tot"><span>TOTAL</span><span className="num">{n(order.total)}</span></div>
-      {order.riderFee > 0 && <div className="ln"><span>Rider fee (to the rider)</span><span className="num">+ {n(order.riderFee)}</span></div>}
-      {order.collectAtDoor > 0 && <div className="ln tot" style={{ borderTopStyle: "solid" }}><span>AT THE DOOR</span><span className="num">{pkr(order.collectAtDoor)}</span></div>}
+      {deliveryShown(order) > 0 && <div className="ln"><span>Delivery fee</span><span className="num">{n(deliveryShown(order))}</span></div>}
+      <div className="ln tot"><span>TOTAL</span><span className="num">{n(totalShown(order))}</span></div>
       {store?.address && <div className="ln mut contact"><span>{store.address}</span></div>}
       <span key={order.status} className="slipchip"><i />{stageName(order.status, order.deliveryKind)}</span>
     </div>

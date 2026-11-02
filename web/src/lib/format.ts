@@ -42,5 +42,11 @@ export function forCustomer<T extends { deliveryPaidBy: "customer" | "store"; ri
   return order.deliveryPaidBy === "store" ? { ...order, riderFee: 0, deliveryCharge: 0 } : order;
 }
 
+/** The delivery as the customer sees it: the store's delivery charge and the rider fee as one amount. Stored apart, shown together. */
+export const deliveryShown = (o: { riderFee: number; deliveryCharge: number }) => o.riderFee + o.deliveryCharge;
+
+/** The one total the customer sees: goods minus discounts plus all the delivery (so the rider fee is in it). Use on a `forCustomer` order. */
+export const totalShown = (o: { total: number; riderFee: number }) => o.total + o.riderFee;
+
 /** What the store itself pays for delivery on this order (0 when the customer pays it). */
 export const deliveryCost = (o: { deliveryPaidBy: "customer" | "store"; riderFee: number; deliveryCharge: number }) => (o.deliveryPaidBy === "store" ? o.riderFee + o.deliveryCharge : 0);

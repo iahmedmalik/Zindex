@@ -104,12 +104,6 @@
 .ivp .iv-ln .iv-amt { font-size: 14.5px; font-weight: 500; color: var(--pink); }
 .ivp .iv-total { display: flex; justify-content: space-between; align-items: baseline; margin-top: 8px; padding-top: 12px; border-top: 1.5px solid var(--pink); font: 600 19px var(--font-display); }
 .ivp .iv-total b { font-weight: 600; font-variant-numeric: tabular-nums; }
-.ivp .iv-door { position: relative; margin: 16px 0 4px; border-radius: 20px; padding: 16px 18px; color: #fff; background: linear-gradient(135deg, var(--store) 0%, var(--store-deep) 100%); overflow: hidden; }
-.ivp .iv-door .iv-routes { inset: 0; width: 100%; height: 100%; }
-.ivp .iv-door > *:not(.iv-routes) { position: relative; }
-.ivp .iv-door span { display: block; font: 600 13px var(--font-display); letter-spacing: 0.02em; color: #ffffffe0; }
-.ivp .iv-door b { display: block; font: 600 34px var(--font-display); letter-spacing: -0.03em; line-height: 1.1; font-variant-numeric: tabular-nums; margin-top: 2px; }
-.ivp .iv-door small { display: block; margin-top: 6px; font-size: 12.5px; color: #ffffffd9; }
 .ivp .iv-fee { font-size: 12.5px; color: var(--pmute); margin: 10px 2px 0; }
 .ivp .iv-foot { margin: 14px 0 0; padding: 14px 4px 30px; border-top: 1.5px dashed #cdbfae; text-align: center; font-size: 12.5px; color: var(--pmute); display: grid; gap: 2px; }
 .ivp .iv-foot b { font: 600 14.5px var(--font-display); color: var(--pink); }
@@ -127,10 +121,9 @@
 .ivp.a4 .iv-to b { font-size: 22px; } .ivp.a4 .iv-to span { font-size: 15.5px; }
 .ivp.a4 .iv-it { padding: 15px 0; } .ivp.a4 .iv-it b { font-size: 17px; } .ivp.a4 .iv-q { min-width: 36px; height: 36px; font-size: 16px; } .ivp.a4 .iv-amt { font-size: 18px; }
 .ivp.a4 .iv-ln { font-size: 16px; } .ivp.a4 .iv-total { font-size: 24px; }
-.ivp.a4 .iv-door { margin-top: 20px; } .ivp.a4 .iv-door b { font-size: 46px; } .ivp.a4 .iv-door span { font-size: 15px; } .ivp.a4 .iv-door small { font-size: 14px; }
 .ivp.a4 .iv-fee { font-size: 14px; }
 .ivp.a4 .iv-foot { font-size: 14px; padding-bottom: 44px; margin-top: 60px; } .ivp.a4 .iv-foot b { font-size: 17px; }
-@media (max-width: 640px) { .ivp.a4 .iv-hero { padding: 24px 20px 60px; } .ivp.a4 .iv-sheet { margin: -30px 10px 0; padding: 22px 18px 6px; } .ivp .iv-cols { grid-template-columns: 1fr; gap: 14px; } .ivp.a4 .iv-door b { font-size: 36px; } }
+@media (max-width: 640px) { .ivp.a4 .iv-hero { padding: 24px 20px 60px; } .ivp.a4 .iv-sheet { margin: -30px 10px 0; padding: 22px 18px 6px; } .ivp .iv-cols { grid-template-columns: 1fr; gap: 14px; } }
 @media print { .ivp { box-shadow: none; max-width: none; } .ivp.compact { max-width: 80mm; } .ivp.a4 .iv-sheet { box-shadow: none; } }
 
 /* A field that was just filled from a saved customer glows once. */

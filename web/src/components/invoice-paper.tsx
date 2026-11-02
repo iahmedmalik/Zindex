@@ -1,28 +1,17 @@
 import { forwardRef } from "react";
-import { forCustomer, offLabel, pkr } from "@/lib/format";
+import { deliveryShown, forCustomer, offLabel, pkr, totalShown } from "@/lib/format";
 import type { Invoice, Order, Store } from "@/lib/types";
 
 export type InvoiceStore = Pick<Store, "name" | "phone" | "email" | "address" | "logoUrl" | "accent"> & Partial<Pick<Store, "watermarkUrl" | "watermarkOn">>;
 
 const n = (v: number) => v.toLocaleString("en-US");
 
-// What the customer sees in the chip and in the "at the door" card, by how the order is paid.
-function payWords(order: Order) {
-  const rider = order.riderFee;
-  if (order.payment === "cod") {
-    return { chip: "Cash on delivery", label: "Have ready for the rider", sub: rider > 0 ? `${pkr(order.codAmount)} for the order + ${pkr(rider)} for the rider` : `${pkr(order.codAmount)} for the order` };
-  }
-  if (order.payment === "paid") {
-    return rider > 0
-      ? { chip: "Paid", label: "Only the rider's fee at the door", sub: "Your order is paid in full" }
-      : { chip: "Paid", label: "Nothing to pay at the door", sub: "Your order is paid in full" };
-  }
-  return { chip: "Pay later", label: rider > 0 ? "At the door: the rider's fee" : "Nothing to pay at the door", sub: `The order total of ${pkr(order.total)} is paid to the shop later` };
-}
+// What the customer sees in the chip, by how the order is paid.
+const payChip = (order: Order) => (order.payment === "cod" ? "Cash on delivery" : order.payment === "paid" ? "Paid" : "Pay later");
 
 /**
  * The invoice paper, "The trip": a gradient header in the store's colour with a dashed delivery
- * curve and a pin, a sheet that slides up over it, and a big "at the door" card. It is also what
+ * curve and a pin, and a sheet that slides up over it. It shows one total, delivery included. It is also what
  * gets saved as an image, so everything is plain HTML and inline SVG (no CSS masks, no <use>):
  * the torn edge is an SVG strip. The paper stays light in dark mode on purpose.
  */
@@ -32,12 +21,10 @@ export const InvoicePaper = forwardRef<HTMLElement, { invoice: Invoice; order: O
 ) {
   const order = forCustomer(placed); // delivery the store pays is not on the customer's invoice
   const date = new Date(invoice.finalisedAt ?? Date.now()).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
-  const words = payWords(order);
-  const chip = words.chip; // a draft already says DRAFT where the number goes
+  const chip = payChip(order); // a draft already says DRAFT where the number goes
   const compact = size === "compact";
   const contact = [store.email, store.phone, compact ? null : store.address].filter(Boolean).join(" · ");
-  const showDoor = order.payment === "cod" || order.riderFee > 0 || order.payment === "unpaid";
-  const door = order.collectAtDoor;
+  const total = totalShown(order);
   const teeth = Array.from({ length: 24 }, (_, i) => `L${240 - i * 10 - 5} 10 L${240 - i * 10 - 10} 0`).join(" ");
 
   const customer = (
@@ -64,27 +51,14 @@ export const InvoicePaper = forwardRef<HTMLElement, { invoice: Invoice; order: O
     <div className="iv-sum">
       <div className="iv-ln"><span>Subtotal</span><span className="iv-amt">{n(order.subtotal)}</span></div>
       {order.discount > 0 && <div className="iv-ln"><span>Discount {order.discountPercent}%</span><span className="iv-amt">− {n(order.discount)}</span></div>}
-      {order.deliveryCharge > 0 && <div className="iv-ln"><span>Delivery</span><span className="iv-amt">{n(order.deliveryCharge)}</span></div>}
-      <div className="iv-total"><span>Total</span><b>{pkr(order.total)}</b></div>
+      {deliveryShown(order) > 0 && <div className="iv-ln"><span>Delivery</span><span className="iv-amt">{n(deliveryShown(order))}</span></div>}
+      <div className="iv-total"><span>Total</span><b>{pkr(total)}</b></div>
     </div>
   );
 
-  const doorCard = showDoor && (
-    <div className="iv-door">
-      <svg className="iv-routes" viewBox="0 0 300 90" preserveAspectRatio="xMidYMid slice" fill="none" aria-hidden="true">
-        <path d="M170 70C200 80 215 40 245 48S280 20 290 18" stroke="#fff" strokeWidth="2.2" strokeDasharray="3 8" strokeLinecap="round" opacity=".45" />
-        <circle cx="170" cy="70" r="5" fill="#fff" opacity=".55" />
-      </svg>
-      <span>{words.label}</span>
-      <b>{pkr(door)}</b>
-      <small>{words.sub}</small>
-    </div>
+  const later = order.payment === "unpaid" && order.expected - order.paid + order.riderFee > 0 && (
+    <p className="iv-fee"><b>To pay later: {pkr(order.expected - order.paid + order.riderFee)}</b>{order.paid > 0 ? ` (paid so far ${pkr(order.paid)} of ${pkr(total)})` : ""}</p>
   );
-
-  const later = order.payment === "unpaid" && order.expected - order.paid > 0 && (
-    <p className="iv-fee"><b>To pay the shop later: {pkr(order.expected - order.paid)}</b>{order.paid > 0 ? ` (paid so far ${pkr(order.paid)} of ${pkr(order.total)})` : ""}</p>
-  );
-  const fee = order.riderFee > 0 && <p className="iv-fee">The rider&apos;s {pkr(order.riderFee)} is paid straight to the rider and is not part of this invoice total.</p>;
 
   return (
     <article ref={ref} className={`ivp ${compact ? "compact" : "a4"}`} style={{ ["--store" as string]: store.accent }}>
@@ -115,14 +89,14 @@ export const InvoicePaper = forwardRef<HTMLElement, { invoice: Invoice; order: O
         {compact ? customer : (
           <div className="iv-cols">
             {customer}
-            <div className="iv-to"><div className="iv-lbl">Deliver by</div><b>{order.deliveryKind === "local" ? "Local rider" : order.deliveryKind === "courier" ? "Courier" : "Pickup"}</b>{order.riderFee > 0 && <span>The rider fee is paid straight to the rider.</span>}</div>
+            <div className="iv-to"><div className="iv-lbl">Deliver by</div><b>{order.deliveryKind === "local" ? "Local rider" : order.deliveryKind === "courier" ? "Courier" : "Pickup"}</b></div>
           </div>
         )}
         {items}
-        {compact ? <>{sum}{doorCard}{later}{fee}</> : (
+        {compact ? <>{sum}{later}</> : (
           <div className="iv-cols" style={{ marginTop: 8, alignItems: "start" }}>
-            <div>{later}{fee}</div>
-            <div>{sum}{doorCard}</div>
+            <div>{later}</div>
+            <div>{sum}</div>
           </div>
         )}
         <div className="iv-foot">

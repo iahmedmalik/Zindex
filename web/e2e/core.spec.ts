@@ -36,7 +36,7 @@ test.describe("an order from WhatsApp to the door", () => {
     await expect(page.getByText("At the door 2,150 · store 1,800 + rider 350")).toBeVisible();
     await page.getByRole("button", { name: "Create order" }).click();
     await page.waitForURL(/\/orders\/[0-9a-f-]{36}\/[0-9a-f-]{36}$/);
-    await expect(page.getByRole("group", { name: /Receipt for order/ })).toContainText("1,800"); // the receipt, not the closed rider section
+    await expect(page.getByRole("group", { name: /Receipt for order/ })).toContainText("2,150"); // the receipt shows one total, 1,800 for the goods + 350 delivery
     await expect(page.getByText(/hands the rider/)).toContainText("PKR 2,150");
     await expect(page.getByText(/brings 1,800 back to you/)).toBeVisible();
   });
