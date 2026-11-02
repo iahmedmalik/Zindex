@@ -87,7 +87,7 @@ export function demoRouter(ctx: AppContext): Router {
   const router = Router();
   router.post("/start", limited, async (req, res) => {
     if (!ctx.config.DEMO_EMAIL || !ctx.config.DEMO_PASSWORD) throw new HttpError(404, "The demo is not switched on.");
-    const session = await ensureDemo(ctx, `http://127.0.0.1:${req.socket.localPort}`);
+    const session = await ensureDemo(ctx, ctx.config.API_PUBLIC_URL ?? `http://127.0.0.1:${req.socket.localPort}`);
     for (const cookie of session.setCookies) res.append("Set-Cookie", cookie);
     res.json({ ok: true });
   });

@@ -17,6 +17,11 @@ const schema = z.object({
   DEMO_PASSWORD: z.string().min(10).optional(),
   // Shopify product sync: {"shop.myshopify.com": {"clientId": "...", "clientSecret": "..."}}. Render only.
   SHOPIFY_APPS: z.string().optional(),
+  // This API's own public address. The demo refresh signs in and seeds through it, because a Vercel function
+  // has no fixed local port to call. Unset = the server calls itself on 127.0.0.1 (Render, local development).
+  API_PUBLIC_URL: z.string().url().optional(),
+  // Lets Vercel's daily cron run the jobs the timers do on Render (routes/cron.ts). Unset = the cron route is off.
+  CRON_SECRET: z.string().min(16, "CRON_SECRET must be at least 16 characters").optional(),
   PORT: z.coerce.number().int().positive().default(4000),
   NODE_ENV: z.string().default("development"),
 });
@@ -29,5 +34,5 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     const lines = parsed.error.issues.map((i) => `  - ${i.message}`).join("\n");
     throw new Error(`The server is not set up correctly:\n${lines}`);
   }
-  return { ...parsed.data, WEB_ORIGIN: parsed.data.WEB_ORIGIN.replace(/\/$/, ""), isProduction: parsed.data.NODE_ENV === "production" };
+  return { ...parsed.data, WEB_ORIGIN: parsed.data.WEB_ORIGIN.replace(/\/$/, ""), API_PUBLIC_URL: parsed.data.API_PUBLIC_URL?.replace(/\/$/, ""), isProduction: parsed.data.NODE_ENV === "production" };
 }

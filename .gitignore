@@ -18,3 +18,7 @@ next-env.d.ts
 
 # Neon CLI local state
 .neon
+
+# the Vercel function bundle (built by npm run build:vercel)
+api/api/
+api/public/

@@ -5,6 +5,7 @@ import type { Config } from "./config";
 import type { Db } from "./db/client";
 import { HttpError } from "./http-error";
 import { publicCardRouter } from "./routes/cards";
+import { cronRouter } from "./routes/cron";
 import { demoRouter } from "./routes/demo";
 import { createRoutes } from "./routes";
 
@@ -36,6 +37,8 @@ export function createApp(ctx?: AppContext): Express {
     res.json({ status: "ok" });
   });
 
+  // The daily jobs for hosts without timers; they check their own secret, so they sit before the sign-in check.
+  if (ctx) app.use("/internal/cron", cronRouter(ctx));
   // The delivery card is opened by customers without an account, so it sits before the sign-in check.
   if (ctx) app.use("/v1/public/card", publicCardRouter(ctx.db));
   // "Try the demo" signs the demo owner in itself, so it also sits before the sign-in check.
