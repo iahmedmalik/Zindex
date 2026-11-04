@@ -1,17 +1,8 @@
 import type { NextConfig } from "next";
 
-// The browser only ever talks to this app's own address; /backend/* is forwarded to the API, so
-// the sign-in cookie belongs to this address (browsers refuse cookies from another site).
-const API_URL = process.env.API_URL ?? "http://127.0.0.1:4000";
-
-const nextConfig: NextConfig = {
-  async rewrites() {
-    return [
-      { source: "/backend/:path*", destination: `${API_URL}/:path*` },
-      // Links in emails (confirm address, reset password) are built from this app's address, so they must reach the API too.
-      { source: "/v1/auth/:path*", destination: `${API_URL}/v1/auth/:path*` },
-    ];
-  },
-};
+// The browser only ever talks to this app's own address. /backend/* and /v1/auth/* are forwarded to the API by
+// route handlers (src/app/backend, src/app/v1/auth; the shared code is src/lib/proxy.ts), which also tell the
+// API who the visitor is. The API address comes from API_URL when the request is handled, not at build time.
+const nextConfig: NextConfig = {};
 
 export default nextConfig;
