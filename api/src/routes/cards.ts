@@ -1,12 +1,12 @@
 import { sql } from "drizzle-orm";
 import { Router } from "express";
-import { rateLimit } from "express-rate-limit";
 import { z } from "zod";
 import type { Config } from "../config";
 import { asOwner, type Db } from "../db/client";
 import { rows } from "../db/query";
 import { hashOf, liveCard, makeCard } from "../cards/token";
 import { HttpError } from "../http-error";
+import { limitBy } from "../rate-limit";
 import { validateBody } from "../validate";
 import { idParam, storeIdOf } from "./ids";
 import { loadOrder } from "./orders";
@@ -61,7 +61,7 @@ export function cardsRouter(db: Db, config: Config): Router {
 // Mounted at /v1/public/card/:token — no sign-in. Rate limited, never cached, hidden from search engines.
 export function publicCardRouter(db: Db): Router {
   const router = Router();
-  router.use(rateLimit({ windowMs: 60_000, limit: 120, standardHeaders: true, legacyHeaders: false, message: { error: "Too many requests. Please wait a minute." } }));
+  router.use(limitBy(db, "card", 120, 60_000, "Too many requests. Please wait a minute."));
 
   router.get("/:token", async (req, res) => {
     const token = String(req.params.token);

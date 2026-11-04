@@ -5,6 +5,7 @@ import { asOwner } from "../db/client";
 import { stores } from "../db/schema";
 import { seedDemo, type Call } from "../demo-seed";
 import { HttpError } from "../http-error";
+import { limitBy } from "../rate-limit";
 
 // "Try the demo": anyone can open a preloaded account without typing a password. The API signs the
 // demo owner in itself (the password never reaches the browser) and hands back the session cookie.
@@ -72,20 +73,10 @@ export async function ensureDemo(ctx: AppContext, base: string) {
   }
 }
 
-// A small per-address limit: opening the demo does real work (sign-in, sometimes a re-seed).
-const hits = new Map<string, number[]>();
-const limited: RequestHandler = (req, _res, next) => {
-  const now = Date.now();
-  const who = req.ip ?? "?";
-  const recent = (hits.get(who) ?? []).filter((t) => now - t < 60_000);
-  if (recent.length >= 10) return next(new HttpError(429, "Too many tries. Wait a minute and try again."));
-  hits.set(who, [...recent, now]);
-  next();
-};
-
 export function demoRouter(ctx: AppContext): Router {
   const router = Router();
-  router.post("/start", limited, async (req, res) => {
+  // Opening the demo does real work (sign-in, sometimes a re-seed), so each address gets a few tries a minute.
+  router.post("/start", limitBy(ctx.db, "demo", 10, 60_000, "Too many tries. Wait a minute and try again."), async (req, res) => {
     if (!ctx.config.DEMO_EMAIL || !ctx.config.DEMO_PASSWORD) throw new HttpError(404, "The demo is not switched on.");
     const session = await ensureDemo(ctx, ctx.config.API_PUBLIC_URL ?? `http://127.0.0.1:${req.socket.localPort}`);
     for (const cookie of session.setCookies) res.append("Set-Cookie", cookie);

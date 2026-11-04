@@ -8,7 +8,7 @@ import type { Mailer } from "./mailer";
 
 // Owner sign-in with Better Auth: email and password, a verified email, a session cookie.
 //
-// The web app (on Vercel) and this API (on Render) are different sites, and browsers block
+// The web app and this API are different sites, and browsers block
 // cookies across sites. So the web app forwards /backend/* to this API, and the cookie belongs
 // to the web app's own address. The web app strips the /backend part, so inside this API the
 // sign-in routes simply live under /v1/auth.
@@ -36,7 +36,7 @@ export function createAuth(db: Db, config: AuthConfig, mailer: Mailer, options: 
     trustedOrigins: [config.WEB_ORIGIN],
     database: drizzleAdapter(db, {
       provider: "pg",
-      schema: { user: schema.user, session: schema.session, account: schema.account, verification: schema.verification },
+      schema: { user: schema.user, session: schema.session, account: schema.account, verification: schema.verification, rateLimit: schema.rateLimit },
     }),
     emailAndPassword: {
       enabled: true,
@@ -103,6 +103,8 @@ export function createAuth(db: Db, config: AuthConfig, mailer: Mailer, options: 
     // Guessing passwords and mass sign-ups are slowed down per address and per path.
     rateLimit: {
       enabled: limiterOn,
+      // In the database, not in memory: on Vercel the API is many short-lived copies that must share one count.
+      storage: "database",
       window: 60,
       max: 100,
       customRules: {

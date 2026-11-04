@@ -66,6 +66,14 @@ export const verification = pgTable(
   (t) => [index("verification_identifier").on(t.identifier)],
 );
 
+// Shared rate-limit counters (sql/029). One row per key, e.g. "203.0.113.5|/sign-in/email" or "demo:203.0.113.5".
+export const rateLimit = pgTable("rate_limit", {
+  id: text("id").primaryKey(),
+  key: text("key").notNull().unique(),
+  count: integer("count").notNull(),
+  lastRequest: bigint("last_request", { mode: "number" }).notNull(),
+});
+
 // ---- stores ----
 export const stores = pgTable(
   "stores",

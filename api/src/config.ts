@@ -22,6 +22,9 @@ const schema = z.object({
   API_PUBLIC_URL: z.string().url().optional(),
   // Lets Vercel's daily cron run the jobs the timers do on Render (routes/cron.ts). Unset = the cron route is off.
   CRON_SECRET: z.string().min(16, "CRON_SECRET must be at least 16 characters").optional(),
+  // Shared with the web app's /backend proxy. A request that carries it is trusted to say who the visitor is
+  // (x-zindex-client-ip), because on Vercel the API only ever sees the web app's address. Unset = header ignored.
+  PROXY_SECRET: z.string().min(16, "PROXY_SECRET must be at least 16 characters").optional(),
   PORT: z.coerce.number().int().positive().default(4000),
   NODE_ENV: z.string().default("development"),
 });

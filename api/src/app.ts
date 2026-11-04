@@ -4,6 +4,7 @@ import type { Auth } from "./auth";
 import type { Config } from "./config";
 import type { Db } from "./db/client";
 import { HttpError } from "./http-error";
+import { trustProxyClient } from "./rate-limit";
 import { publicCardRouter } from "./routes/cards";
 import { cronRouter } from "./routes/cron";
 import { demoRouter } from "./routes/demo";
@@ -26,6 +27,9 @@ export function createApp(ctx?: AppContext): Express {
   app.disable("x-powered-by");
   // Render sits behind a proxy: trust one hop so the client address is the real one.
   app.set("trust proxy", 1);
+
+  // The web app's /backend proxy tells us who the visitor really is (see rate-limit.ts); this must run first.
+  app.use(trustProxyClient(ctx?.config.PROXY_SECRET));
 
   // Sign-in must be mounted before the JSON parser: Better Auth reads the raw request itself.
   if (ctx) app.all("/v1/auth/*splat", toNodeHandler(ctx.auth));

@@ -3,6 +3,7 @@ import { Router } from "express";
 import type { AppContext } from "../app";
 import { HttpError } from "../http-error";
 import { purgeDeliveryPhotos } from "../maintenance";
+import { clearOldCounters } from "../rate-limit";
 import { ensureDemo } from "./demo";
 
 const sameSecret = (given: string, wanted: string) => {
@@ -23,6 +24,7 @@ export function cronRouter(ctx: AppContext): Router {
     if (!sameSecret(req.headers.authorization ?? "", `Bearer ${secret}`)) throw new HttpError(401, "Not allowed.");
 
     const removedPhotos = await purgeDeliveryPhotos(ctx.db);
+    await clearOldCounters(ctx.db);
     const demoOn = Boolean(ctx.config.DEMO_EMAIL && ctx.config.DEMO_PASSWORD && ctx.config.API_PUBLIC_URL);
     if (demoOn) await ensureDemo(ctx, ctx.config.API_PUBLIC_URL!);
     res.json({ removedPhotos, demo: demoOn ? "refreshed" : "off" });
