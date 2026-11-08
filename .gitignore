@@ -19,6 +19,6 @@ next-env.d.ts
 # Neon CLI local state
 .neon
 
-# the Vercel function bundle (built by npm run build:vercel)
-api/api/
+# the Vercel function bundle (built by npm run build:vercel); api/api/index.js is the committed entry that loads it
+api/dist-vercel/
 api/public/
