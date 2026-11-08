@@ -29,6 +29,26 @@ test.describe("editing an order", () => {
     await expect(slip).toContainText("Pending"); // the status did not change
   });
 
+  test("@smoke the Store can be changed: the order moves, says what will happen first, and shows under the new store", async ({ page }) => {
+    const stamp = String(Date.now() % 1000000);
+    await createOrder(page, { name: `Move Me ${stamp}` }); // made in Sheen Food
+    await expect(page.getByText(/Sheen Food/).first()).toBeVisible();
+    await page.getByRole("link", { name: "Edit", exact: true }).click();
+    await expect(page.getByRole("heading", { name: /Edit order #\d+/ })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Save changes" })).toBeVisible();
+
+    await page.locator(".seg label", { hasText: /^Sheen Perfumes$/ }).click();
+    await expect(page.getByRole("radio", { name: "Sheen Perfumes", exact: true })).toBeChecked();
+    await expect(page.getByText(/Moving this order to Sheen Perfumes/)).toBeVisible();
+    await expect(page.getByText(/next order number/)).toBeVisible();
+    await page.getByRole("button", { name: "Move and save" }).click();
+
+    await expect(page.getByRole("heading", { name: new RegExp(`Move Me ${stamp}`) })).toBeVisible();
+    const subtitle = page.locator("p.note", { hasText: /^\d+ · / }); // phone number · store name
+    await expect(subtitle).toContainText("Sheen Perfumes");
+    await expect(subtitle).not.toContainText("Sheen Food");
+  });
+
   test("a delivered order can still be edited", async ({ page }) => {
     await createOrder(page, { name: `Delivered Edit ${Date.now() % 1000000}` });
     for (const step of ["Confirm order", "Mark packed", "Out for delivery", "Mark delivered"]) {

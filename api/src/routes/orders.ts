@@ -9,7 +9,7 @@ import { HttpError } from "../http-error";
 import { calculateTotals, lineDiscount } from "../invoice/totals";
 import { canMove, stages, type Stage } from "../orders/stages";
 import { createInvoice, recordInvoiceEdit } from "./invoices";
-import { adjustForEdit, deductForOrder, restoreForOrder, type StockWarning } from "../stock/ledger";
+import { adjustForEdit, deductForOrder, moveStock, restoreForOrder, type StockWarning } from "../stock/ledger";
 import { normalisePhone } from "../phone";
 import { validateBody } from "../validate";
 import { idParam, storeIdOf } from "./ids";
@@ -71,7 +71,8 @@ const createBody = z
     idempotencyKey: fields.idempotencyKey.optional(),
   })
   .strict();
-const updateBody = createBody.omit({ idempotencyKey: true, source: true }).partial().strict();
+// `storeId` moves the order to another of the owner's stores (see "Moving an order" below).
+const updateBody = createBody.omit({ idempotencyKey: true, source: true }).partial().extend({ storeId: z.uuid().optional() }).strict();
 const statusBody = z.object({ status: z.enum(stages) }).strict();
 
 export type ItemDiscount = { kind: "percent" | "amount"; value: number };
@@ -162,6 +163,57 @@ async function resolveItems(tx: Tx, storeId: string, items: ItemInput[], previou
     out.push({ ...line, discount, discountAmount });
   }
   return out;
+}
+
+// ---- Moving an order to another store ----
+// Products belong to one store, so before the move every line is matched to the new store: a product with the same
+// name there (names are unique per store, ignoring case) is used, otherwise the line becomes a typed line (name, price
+// and cost kept, no stock). Lines that already point at a product of the new store stay as they are.
+async function rematchItems(tx: Tx, to: string, items: ItemInput[]): Promise<ItemInput[]> {
+  const out: ItemInput[] = [];
+  for (const item of items) {
+    if (!item.productId) {
+      out.push(item);
+      continue;
+    }
+    const [already] = await rows<{ id: string }>(tx, sql`select id from products where id = ${item.productId} and store_id = ${to}`);
+    if (already) {
+      out.push(item);
+      continue;
+    }
+    const [old] = await rows<{ name: string; price: number; cost: number | null }>(tx, sql`select name, price, cost from products where id = ${item.productId}`);
+    if (!old) throw new HttpError(400, "One of the products could not be found.");
+    const name = item.name ?? old.name;
+    const [same] = await rows<{ id: string }>(tx, sql`select id from products where store_id = ${to} and lower(name) = lower(${old.name}) order by active desc limit 1`);
+    const { productId: _gone, ...rest } = item;
+    out.push(same ? { ...rest, productId: same.id, name } : { ...rest, name, unitPrice: item.unitPrice ?? old.price, unitCost: item.unitCost !== undefined ? item.unitCost : old.cost });
+  }
+  return out;
+}
+
+const asInput = (i: OrderItem): ItemInput => ({
+  ...(i.productId ? { productId: i.productId } : {}),
+  name: i.name,
+  quantity: i.quantity,
+  unitPrice: i.unitPrice,
+  unitCost: i.unitCost,
+  discount: i.discountKind && i.discountValue !== null ? { kind: i.discountKind, value: i.discountValue } : null,
+});
+
+/** The invoice follows the order: new store, and (if it already had a number) the next number of that store. */
+async function moveInvoice(tx: Tx, from: string, to: string, orderId: string): Promise<void> {
+  const [inv] = await rows<{ number: string | null }>(tx, sql`select number from invoices where order_id = ${orderId}`);
+  if (!inv) return;
+  const [st] = await rows<{ nextInvoiceNo: number }>(tx, sql`select next_invoice_no from stores where id = ${from}`);
+  const seq = inv.number ? Number(inv.number.split("-").pop()) : NaN;
+  const wasLatest = Number.isInteger(seq) && !!st && seq === st.nextInvoiceNo - 1;
+  if (inv.number) {
+    const [{ number }] = (await rows<{ number: string }>(tx, sql`select allocate_invoice_number(${to}) as number`)) as [{ number: string }];
+    await tx.execute(sql`update invoices set store_id = ${to}, number = ${number} where order_id = ${orderId}`);
+  } else {
+    await tx.execute(sql`update invoices set store_id = ${to} where order_id = ${orderId}`);
+  }
+  if (wasLatest) await tx.execute(sql`select release_invoice_number(${from}::uuid, ${seq}::int)`); // the old store gets its number back when nothing came after it
 }
 
 // A pickup has no delivery to pay for, so it is always "customer" (the default, which changes nothing).
@@ -389,15 +441,28 @@ export function ordersRouter(db: Db, config: Config): Router {
   // Editing works at any stage except cancelled or returned: every total is worked out again and the status stays. If the
   // order already took stock out, the change in items moves the stock by the difference (an 'edit' movement). Payments
   // already recorded stay; if the new total is lower the order simply shows as overpaid.
+  // With `storeId` in the body the order moves to another of the owner's stores: it gets that store's next order number
+  // and invoice number, its lines are matched to that store's products, its stock moves with it, and the customer is
+  // saved there. Everything happens in one transaction, so a failure leaves the order exactly where it was.
   router.patch("/:id", validateBody(updateBody), async (req, res) => {
     const b = req.body as z.infer<typeof updateBody>;
     const storeId = storeIdOf(req);
     const id = idParam(req, "id", "Order");
+    const moveTo = b.storeId && b.storeId !== storeId ? b.storeId : null;
+    let stockWarnings: StockWarning[] = [];
+    try {
     const order = await asOwner(db, req.user!.id, async (tx) => {
       const current = await loadOrder(tx, storeId, id);
       if (!current) throw new HttpError(404, "Order not found.");
       if (current.status === "cancelled" || current.status === "returned") throw new HttpError(409, `A ${current.status} order cannot be edited.`);
-      const items = b.items ? await resolveItems(tx, storeId, b.items, current.items) : current.items.map((i) => ({ productId: i.productId, name: i.name, quantity: i.quantity, unitPrice: i.unitPrice, unitCost: i.unitCost, discount: i.discountKind && i.discountValue !== null ? { kind: i.discountKind, value: i.discountValue } : null, discountAmount: i.discountAmount }));
+      if (moveTo) {
+        const [target] = await rows<{ id: string }>(tx, sql`select id from stores where id = ${moveTo}`);
+        if (!target) throw new HttpError(404, "Store not found.");
+      }
+      const dest = moveTo ?? storeId;
+      const items = moveTo
+        ? await resolveItems(tx, dest, await rematchItems(tx, dest, b.items ?? current.items.map(asInput)), [])
+        : b.items ? await resolveItems(tx, storeId, b.items, current.items) : current.items.map((i) => ({ productId: i.productId, name: i.name, quantity: i.quantity, unitPrice: i.unitPrice, unitCost: i.unitCost, discount: i.discountKind && i.discountValue !== null ? { kind: i.discountKind, value: i.discountValue } : null, discountAmount: i.discountAmount }));
       const v = {
         discountPercent: b.discountPercent ?? current.discountPercent,
         deliveryCharge: b.deliveryCharge ?? current.deliveryCharge,
@@ -409,7 +474,18 @@ export function ordersRouter(db: Db, config: Config): Router {
       const name = b.customerName ?? current.customerName;
       const phone = "customerPhone" in b ? (b.customerPhone ?? null) : current.customerPhone;
       const address = "address" in b ? (b.address ?? null) : current.address;
-      const customerId = "customerPhone" in b || "customerName" in b ? await saveCustomer(tx, storeId, name, phone, address) : current.customerId;
+      const sameStoreCustomerId = !moveTo && ("customerPhone" in b || "customerName" in b) ? await saveCustomer(tx, storeId, name, phone, address) : current.customerId;
+      const customerId = moveTo ? await saveCustomer(tx, dest, name, phone, address) : sameStoreCustomerId;
+
+      let orderNo = current.orderNo;
+      if (moveTo) {
+        orderNo = (await rows<{ orderNo: number }>(tx, sql`select allocate_order_no(${dest}) as order_no`))[0]!.orderNo;
+        await tx.execute(sql`update orders set store_id = ${dest}, order_no = ${orderNo} where id = ${id}`);
+        // the invoice, delivery and parcel carry the store too (their security rules need it to match the order's)
+        await moveInvoice(tx, storeId, dest, id);
+        await tx.execute(sql`update deliveries set store_id = ${dest} where order_id = ${id}`);
+        await tx.execute(sql`update shipments set store_id = ${dest} where order_id = ${id}`);
+      }
 
       await tx.execute(
         sql`update orders set customer_id = ${customerId}, customer_name = ${name}, customer_phone = ${phone}, address = ${address},
@@ -422,7 +498,10 @@ export function ordersRouter(db: Db, config: Config): Router {
               notes = ${"notes" in b ? (b.notes ?? null) : current.notes}, updated_at = now()
             where id = ${id}`,
       );
-      if (b.items) {
+      if (moveTo) {
+        if (current.stockApplied) stockWarnings = await moveStock(tx, storeId, dest, id, orderNo, items);
+        await writeItems(tx, id, items);
+      } else if (b.items) {
         if (current.stockApplied) {
           try {
             await adjustForEdit(tx, storeId, id, current.orderNo, current.items, items);
@@ -434,11 +513,19 @@ export function ordersRouter(db: Db, config: Config): Router {
         }
         await writeItems(tx, id, items);
       }
-      const saved = await loadOrder(tx, storeId, id);
+      const saved = await loadOrder(tx, dest, id);
       await recordInvoiceEdit(tx, current, saved!);
       return saved;
     });
-    res.json({ order });
+    res.json({ order, stockWarnings });
+    } catch (err) {
+      if (moveTo) {
+        const code = pgCode(err);
+        if (code === "23505") throw new HttpError(409, "This order's Shopify reference or courier tracking number is already used in the other store, so it cannot move there. Nothing was changed.");
+        if (code === "42501") throw new HttpError(409, "Moving an order needs the latest database update (030), which has not been run yet. Nothing was changed.");
+      }
+      throw err;
+    }
   });
 
   router.post("/:id/status", validateBody(statusBody), async (req, res) => {
