@@ -46,6 +46,36 @@ export async function adjustForEdit(tx: Tx, storeId: string, orderId: string, or
   }
 }
 
+/**
+ * A confirmed order moves to another store: what it took out of the old store goes back (one 'edit' row per product that
+ * is still out), and the new lines are taken out of the new store. Both use reason 'edit' so the order's single 'sale'
+ * and 'restore' rows stay unique; a later cancel nets everything per product. Returns the products now below zero.
+ */
+export async function moveStock(tx: Tx, from: string, to: string, orderId: string, orderNo: number, after: { productId: string | null; quantity: number }[]): Promise<StockWarning[]> {
+  await tx.execute(
+    sql`insert into stock_movements (store_id, product_id, delta, reason, order_id, note)
+        select ${from}, product_id, -sum(delta)::int, 'edit', ${orderId}, ${`Order #${orderNo} moved to another store`}
+          from stock_movements where order_id = ${orderId} and store_id = ${from}
+         group by product_id having sum(delta) <> 0`,
+  );
+  const wanted = new Map<string, number>();
+  for (const l of after) if (l.productId) wanted.set(l.productId, (wanted.get(l.productId) ?? 0) + l.quantity);
+  for (const [productId, qty] of wanted) {
+    await tx.execute(
+      sql`insert into stock_movements (store_id, product_id, delta, reason, order_id, note)
+          values (${to}, ${productId}, ${-qty}, 'edit', ${orderId}, ${`Order #${orderNo} moved here`})`,
+    );
+  }
+  if (wanted.size === 0) return [];
+  return rows<StockWarning>(
+    tx,
+    sql`select p.id as product_id, p.name, coalesce(sum(m.delta), 0)::int as on_hand
+          from products p join stock_movements m on m.product_id = p.id
+         where p.id in (${sql.join([...wanted.keys()].map((id) => sql`${id}`), sql`, `)})
+         group by p.id, p.name having coalesce(sum(m.delta), 0) < 0`,
+  );
+}
+
 /** Puts a cancelled or returned order's stock back. Only called after the owner approves. */
 export async function restoreForOrder(tx: Tx, storeId: string, orderId: string): Promise<number> {
   const put = await rows<{ id: string }>(

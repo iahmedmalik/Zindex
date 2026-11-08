@@ -47,13 +47,37 @@ export function OrderForm({ edit }: { edit?: Order }) {
   const [notes, setNotes] = useState(edit?.notes ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  // Editing: the store the lines' products belong to, and what the last match to another store did (kept for the note).
+  const linesStore = useRef(edit?.storeId ?? "");
+  const [moveInfo, setMoveInfo] = useState<{ matched: number; typed: number } | null>(null);
   // One key per form: a retried save on a weak signal returns the same order, never a second one.
   const key = useRef(typeof crypto !== "undefined" ? crypto.randomUUID() : String(Date.now()));
 
   useEffect(() => { if (!formStore && stores[0]) setFormStore(stores[0].id); }, [stores, formStore]);
   useEffect(() => {
     if (!formStore) return;
-    api<{ products: Product[] }>(`/stores/${formStore}/products`).then((r) => setProducts(r.products.filter((p) => p.active))).catch((e) => setError(messageOf(e)));
+    let stale = false;
+    api<{ products: Product[] }>(`/stores/${formStore}/products`).then((r) => {
+      if (stale) return;
+      const active = r.products.filter((p) => p.active);
+      setProducts(active);
+      // Editing an order and picking another store: products belong to one store, so each line is matched to the
+      // product with the same name there, or becomes a typed item (no stock). The server does the same check on save.
+      if (edit && linesStore.current !== formStore) {
+        linesStore.current = formStore;
+        let matched = 0, typed = 0;
+        setLines((ls) => ls.map((l) => {
+          if (!l.productId) return l;
+          const same = active.find((p) => p.name.toLowerCase() === l.name.trim().toLowerCase());
+          if (same) { matched += 1; return { ...l, productId: same.id }; }
+          typed += 1;
+          return { ...l, productId: undefined };
+        }));
+        setMoveInfo(formStore === edit.storeId ? null : { matched, typed });
+      }
+    }).catch((e) => { if (!stale) setError(messageOf(e)); });
+    return () => { stale = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formStore]);
   useEffect(() => {
     // Matches for whichever box is being typed in: a number (4 digits or more) or a name (2 letters or more).
@@ -74,6 +98,7 @@ export function OrderForm({ edit }: { edit?: Order }) {
   const doorFee = storePays ? 0 : fee; // the rider fee the customer hands over; when we pay the rider it is not at the door
   const qtyOf = (id: string) => lines.find((l) => l.productId === id)?.quantity ?? 0;
   const who = name.trim().length > 1;
+  const moving = !!edit && formStore !== edit.storeId;
 
   const add = (p: Product) => setLines((ls) => {
     const at = ls.findIndex((l) => l.productId === p.id);
@@ -105,9 +130,10 @@ export function OrderForm({ edit }: { edit?: Order }) {
         notes: notes.trim() || null,
       };
       if (edit) {
-        await api(`/stores/${edit.storeId}/orders/${edit.id}`, { method: "PATCH", body });
-        toast(`Order #${edit.orderNo} saved`);
-        router.push(`/orders/${edit.storeId}/${edit.id}`);
+        // The request goes to the store the order is in now; `storeId` asks the server to move it to the picked store.
+        const r = await api<{ order: Order }>(`/stores/${edit.storeId}/orders/${edit.id}`, { method: "PATCH", body: moving ? { ...body, storeId: formStore } : body });
+        toast(moving ? `Order #${r.order.orderNo} moved to ${store?.name ?? "the other store"}` : `Order #${edit.orderNo} saved`);
+        router.push(`/orders/${r.order.storeId}/${edit.id}`);
         return;
       }
       const { order } = await api<{ order: Order }>(`/stores/${formStore}/orders`, { method: "POST", body: { ...body, idempotencyKey: key.current } });
@@ -121,13 +147,25 @@ export function OrderForm({ edit }: { edit?: Order }) {
 
   if (stores.length === 0) return <div className="empty"><b>Add a store first</b><span>Orders belong to a store. Add one in Settings.</span></div>;
   const store = stores.find((s) => s.id === formStore);
+  const oldStore = edit ? stores.find((s) => s.id === edit.storeId) : undefined;
 
   return (
     <form className="stack store-scope" style={{ gap: 28, ["--store-base" as string]: store?.accent }} onSubmit={(e) => { e.preventDefault(); void create(); }}>
       <div className="stack">
         {edit && <Link href={`/orders/${edit.storeId}/${edit.id}`} className="note" style={{ display: "inline-flex", alignItems: "center", gap: 6, textDecoration: "none" }}><Icon name="back" size={16} />Back to the order</Link>}
         <h1>{edit ? `Edit order #${edit.orderNo}` : "New order"}</h1>
-        {!edit && stores.length > 1 && <Seg label="Store" value={formStore} onChange={(v) => { setFormStore(v); setLines([]); }} options={stores.map((s) => [s.id, s.name] as const)} />}
+        {stores.length > 1 && <Seg label="Store" value={formStore} onChange={(v) => { setFormStore(v); if (!edit) setLines([]); }} options={stores.map((s) => [s.id, s.name] as const)} />}
+        {edit && (
+          <div className={`expand${moving ? " open" : ""}`}><div>
+            <p className="note">
+              Moving this order to {store?.name}. It gets the next order number{edit.status !== "pending" ? " and invoice number" : ""} of that store, and the customer is saved there.
+              {moveInfo && moveInfo.matched > 0 ? ` ${moveInfo.matched} item${moveInfo.matched === 1 ? "" : "s"} matched to ${store?.name}'s products by name.` : ""}
+              {moveInfo && moveInfo.typed > 0 ? ` ${moveInfo.typed} item${moveInfo.typed === 1 ? " has" : "s have"} no product with that name there and will be kept as typed ${moveInfo.typed === 1 ? "item" : "items"}, without stock.` : ""}
+              {edit.stockApplied ? ` Its stock is put back in ${oldStore?.name ?? "the old store"} and taken from ${store?.name}.` : ""}
+              {edit.status === "out_for_delivery" || edit.status === "delivered" ? " It has already gone out, so the invoice number the customer holds will no longer match." : ""}
+            </p>
+          </div></div>
+        )}
       </div>
 
       <section className="section">
@@ -227,7 +265,7 @@ export function OrderForm({ edit }: { edit?: Order }) {
             {t.codAmount > 0 && doorFee > 0 ? `At the door ${door.toLocaleString("en-US")} · store ${t.codAmount.toLocaleString("en-US")} + rider ${doorFee.toLocaleString("en-US")}` : t.codAmount > 0 ? `Collect ${t.codAmount.toLocaleString("en-US")} for the store` : `Rider collects only his fee, ${doorFee.toLocaleString("en-US")}`}
           </span></div></div>
         </div>
-        <button className="btn" disabled={busy || lines.length === 0 || !who}>{busy ? "Saving…" : edit ? "Save changes" : "Create order"}</button>
+        <button className="btn" disabled={busy || lines.length === 0 || !who}>{busy ? "Saving…" : moving ? "Move and save" : edit ? "Save changes" : "Create order"}</button>
       </div>
     </form>
   );
